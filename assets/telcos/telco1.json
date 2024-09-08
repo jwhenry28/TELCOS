@@ -1,0 +1,77 @@
+{
+	"name": "telco1",
+	"users": [
+		{
+			"name": "telco1",
+			"password": "telco1",
+			"home": "/home/telco1",
+			"path": "/bin:/home/telco1"
+		},
+		{
+			"name": "dialer",
+			"password": "buzzard",
+			"home": "/home/dialer",
+			"path": "/bin:/home/dialer"
+		}	
+	],
+	"filesys": {
+		"": {
+			"name": "",
+			"type": "dir",
+			"children": [
+				{
+					"name": "bin",
+					"type": "dir",
+					"permissions": "dialer:r-x",
+					"children": [
+						{
+							"name": "dial",
+							"type": "executable"
+						}
+					]
+				},
+				{
+					"name": "tmp",
+					"type": "dir",
+					"children": [
+						{
+							"name": "document.txt",
+							"type": "file",
+							"content": "dialer:buzzard"
+						}
+					]
+				},
+				{
+					"name": "home",
+					"type": "dir",
+					"children": [
+						{
+							"name": "telco1",
+							"type": "dir",
+							"permissions": "telco1:rw-",
+							"children": [
+								{
+									"name": "todo.txt",
+									"type": "file",
+									"content": "remove credentials from /tmp"
+								}
+							]
+						},
+						{
+							"name": "dialer",
+							"type": "dir",
+							"permissions": "dialer:rw-",
+							"children": [
+								{
+									"name": "history.txt",
+									"type": "file",
+									"content": "dial telco2"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	}
+}

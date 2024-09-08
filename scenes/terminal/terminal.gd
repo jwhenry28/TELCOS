@@ -13,14 +13,25 @@ var terminal_history_scrollbar
 
 var old_max_scroll_height = 0
 
+var terminal_history = [
+	"> whoami",
+	"root"
+]
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
+	print("terminal: loading")
 	terminal_history_container = $"TerminalHistory"
 	vbox_container = $"TerminalHistory/VBoxContainer"
 	cmd_prompt_textedit = $"TerminalHistory/VBoxContainer/HBoxContainer/CmdPrompt"
 	terminal_history_scrollbar = $"TerminalHistory".get_v_scroll_bar()
 	
 	last_sibling_index = vbox_container.get_child_count() - 2
+	
+	for item in terminal_history:
+		add_to_history(item)
+
+	print("terminal: done")
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
@@ -29,12 +40,12 @@ func _process(delta: float) -> void:
 		adjust_scrollbar()
 		old_max_scroll_height = terminal_history_scrollbar.max_value
 	
-	if Input.is_action_just_released("cmd_enter"):
+
+func consume_text() -> String:
 		var cmd = cmd_prompt_textedit.text
 		cmd_prompt_textedit.text = ''
-		add_to_history("> " + cmd)
-		run_cmd(cmd)
-		adjust_scrollbar()
+		
+		return cmd
 
 
 func adjust_scrollbar() -> void:

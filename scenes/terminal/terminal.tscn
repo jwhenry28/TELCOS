@@ -1,6 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://dcu2kfgje6oqm"]
-
-[ext_resource type="Theme" uid="uid://jhgebuatp6es" path="res://telcos.tres" id="1_o8oe5"]
+[gd_scene load_steps=2 format=3 uid="uid://dcu2kfgje6oqm"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_i6ckf"]
 bg_color = Color(0, 0, 0, 0)
@@ -26,31 +24,25 @@ vertical_scroll_mode = 3
 
 [node name="VBoxContainer" type="VBoxContainer" parent="TerminalHistory"]
 layout_mode = 2
-theme = ExtResource("1_o8oe5")
 
 [node name="Welcome" type="Label" parent="TerminalHistory/VBoxContainer"]
 layout_mode = 2
-theme = ExtResource("1_o8oe5")
 text = "WELCOME TO TELCO1. TYPE 'HELP' TO BEGIN:"
 
 [node name="whoami" type="Label" parent="TerminalHistory/VBoxContainer"]
 layout_mode = 2
-theme = ExtResource("1_o8oe5")
 text = "> whoami"
 
 [node name="telco1" type="Label" parent="TerminalHistory/VBoxContainer"]
 layout_mode = 2
-theme = ExtResource("1_o8oe5")
 text = "telco1@telco1"
 
 [node name="HBoxContainer" type="HBoxContainer" parent="TerminalHistory/VBoxContainer"]
 layout_mode = 2
-theme = ExtResource("1_o8oe5")
 
 [node name=">" type="Label" parent="TerminalHistory/VBoxContainer/HBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 0
-theme = ExtResource("1_o8oe5")
 text = ">"
 
 [node name="CmdPrompt" type="TextEdit" parent="TerminalHistory/VBoxContainer/HBoxContainer"]
@@ -58,7 +50,6 @@ clip_contents = false
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 size_flags_horizontal = 3
-theme = ExtResource("1_o8oe5")
 theme_override_colors/background_color = Color(0.0431373, 0.196078, 0.0156863, 1)
 theme_override_colors/font_color = Color(0.223529, 1, 0.0784314, 1)
 theme_override_styles/focus = SubResource("StyleBoxFlat_i6ckf")

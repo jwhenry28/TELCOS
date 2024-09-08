@@ -1,0 +1,49 @@
+[gd_scene load_steps=6 format=3 uid="uid://dabc33oxpynev"]
+
+[ext_resource type="Script" path="res://scenes/main/main.gd" id="1_8xtc6"]
+[ext_resource type="FontFile" uid="uid://bgadrxg0ccdgb" path="res://fonts/SFMonoRegular.otf" id="1_wqm58"]
+[ext_resource type="PackedScene" uid="uid://dcu2kfgje6oqm" path="res://scenes/terminal/terminal.tscn" id="2_vjuq6"]
+[ext_resource type="Script" path="res://scenes/terminal/terminal.gd" id="3_2qah6"]
+[ext_resource type="PackedScene" uid="uid://dvq5dqvc2irvu" path="res://scenes/telcOS/telc_os.tscn" id="4_1jtnw"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_8xtc6")
+
+[node name="BlackBackground" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Title" type="Label" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -58.0
+offset_right = 58.0
+offset_bottom = 45.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.223529, 1, 0.0784314, 1)
+theme_override_fonts/font = ExtResource("1_wqm58")
+theme_override_font_sizes/font_size = 16
+text = "TELCOS"
+horizontal_alignment = 1
+
+[node name="Terminal" parent="." instance=ExtResource("2_vjuq6")]
+script = ExtResource("3_2qah6")
+
+[node name="Comms" type="Panel" parent="."]
+offset_left = 640.0
+offset_top = 32.0
+offset_right = 1024.0
+offset_bottom = 275.0
+
+[node name="Stats" type="Panel" parent="."]
+offset_left = 640.0
+offset_top = 305.0
+offset_right = 1024.0
+offset_bottom = 548.0
+
+[node name="OS" parent="." instance=ExtResource("4_1jtnw")]

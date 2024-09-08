@@ -1,0 +1,28 @@
+<telco name="telco1">
+	<users>
+		<user name="telco1" password="telco1" home="/home/telco1" path="/bin:/home/telco1" />
+		<user name="dialer" password="buzzard" home="/home/dialer" path="/bin:/home/dialer" />
+	</users>
+	<filesys>
+		<inode name="" type="dir">
+			<inode name="bin" type="dir" permissions="dialer:r-x">
+				<inode name="dial" type="executable"></inode>
+			</inode>
+			<inode name="tmp" type="dir">
+				<inode name="document.txt" type="file">
+					dialer:buzzard
+				</inode>
+			</inode>
+			<inode name="home" type="dir">
+				<inode name="telco1" type="dir" permissions="telco1:rw-">
+					<inode name="todo.txt" type="file">remove credentials from /tmp</inode>
+				</inode>
+				<inode name="dialer" type="dir" permissions="dialer:rw-">
+					<inode name="history.txt" type="file">
+						dial telco2
+					</inode>
+				</inode>
+			</inode>
+		</inode>
+	</filesys>
+</telco>

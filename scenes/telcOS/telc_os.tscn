@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dvq5dqvc2irvu"]
+
+[ext_resource type="Script" path="res://scenes/telcOS/telc_os.gd" id="1_unjrr"]
+
+[node name="TelcOS" type="Node"]
+script = ExtResource("1_unjrr")
