@@ -231,6 +231,11 @@ class iNode:
 	func set_content(new_content:String) -> void:
 		# TODO: use return type instead if this becomes irritating
 		assert(type == 'file', "Only files can have content")
+
+		# hack - this will prevent me from having tabs in the file contents.
+		# I'll figure out how to strip leading tabs from the XML file if this 
+		# becomes a problem.
+		new_content = new_content.replace("\t", "")
 		self.content = new_content
 	
 
@@ -256,7 +261,7 @@ class iNode:
 		inode_string += "permissions:\n"
 		for permission in self.permissions:
 			inode_string += " - " + permission + ": " + self.permissions[permission] + "\n"
-			
+
 		inode_string += "properties: "
 		for property in self.properties:
 			inode_string += property + ";"
