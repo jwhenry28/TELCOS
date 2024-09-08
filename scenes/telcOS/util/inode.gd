@@ -6,10 +6,10 @@ var type: String
 var permissions: Dictionary
 var content: String
 var children: Array[iNode]
-var properties: Array[String]
+var properties: Dictionary
 
 
-func _init(new_name:String, new_type:String, new_permissions:Dictionary = {}, new_properties:Array[String] = []):
+func _init(new_name:String, new_type:String, new_permissions:Dictionary = {}, new_properties:Dictionary = {}):
 	self.name = new_name
 	self.type = new_type
 
@@ -47,7 +47,12 @@ func set_content(new_content:String) -> void:
 
 
 func get_user_permissions(username:String):
-	return self.permissions[username]
+	if permissions.has("*"):
+		return permissions["*"]
+	elif permissions.has(username):
+		return permissions[username]
+
+	return "---"
 
 
 func print_inode(recursive:bool = false, spacing:String = "") -> void:
@@ -71,7 +76,7 @@ func _to_string() -> String:
 
 	inode_string += "properties: "
 	for property in self.properties:
-		inode_string += property + ";"
+		inode_string += property + "=" + self.properties[property] + ";"
 	inode_string += "\n"
 
 	inode_string += "content: " + self.content + "\n"
