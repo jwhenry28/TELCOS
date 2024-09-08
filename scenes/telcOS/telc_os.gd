@@ -18,7 +18,7 @@ func _process(delta: float) -> void:
 func load_telco(new_telco_name: String) -> void:
 	telco_name = new_telco_name
 	load_telco_xml(telco_name)
-	print('TELCO LOADED. Sanity check:')
+	print('\n\n\nTELCO LOADED. Sanity check:')
 	print("name: ", telco_name)
 	print("users: ", users)
 	print("FILESYSTEM:")
@@ -63,6 +63,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 						var file_name = attributes_dict.get('name')
 						var file_type = attributes_dict.get('type')
 						var file_unparsed_permissions = attributes_dict.get('permissions', '')
+						var file_unparsed_properties = attributes_dict.get('properties', '')
 
 						assert (file_name != null and file_type != null, "iNode name and type cannot be empty")
 
@@ -93,10 +94,16 @@ func load_telco_xml(new_telco_name: String) -> void:
 								var username = parsed_permission[0]
 								var permissions = parsed_permission[1]
 								file_permissions[username] = permissions
+						
+						var file_properties:Array[String] = []
+						for property in file_unparsed_properties.split(';'):
+							if property == '':
+								continue
+							print("parsing: ", property)
+							file_properties.append(property)
 
-						var new_inode = iNode.new(file_name, file_type, file_permissions)
-						print("adding inode:")
-						print(new_inode)
+						var new_inode = iNode.new(file_name, file_type, file_permissions, file_properties)
+						print("adding inode: " + file_name)
 						var res = add_to_filesystem(file_path, new_inode)
 						assert (res, "Failed to add inode to filesystem")
 
@@ -191,10 +198,11 @@ class iNode:
 	var type: String
 	var permissions: Dictionary
 	var content: String
-	var children: Array
+	var children: Array[iNode]
+	var properties: Array[String]
 
 
-	func _init(new_name:String, new_type:String, new_permissions:Dictionary = {}):
+	func _init(new_name:String, new_type:String, new_permissions:Dictionary = {}, new_properties:Array[String] = []):
 		self.name = new_name
 		self.type = new_type
 
@@ -203,6 +211,7 @@ class iNode:
 
 		self.permissions = new_permissions
 		self.children = []
+		self.properties = new_properties
 
 
 	func add_child(new_child:iNode) -> void:
@@ -232,7 +241,7 @@ class iNode:
 	func print_inode(recursive:bool = false, spacing:String = "") -> void:
 		print(spacing + self.name + " (" + self.type + ")")
 		for child in self.children:
-			child.print_inode(recursive, spacing + "  ")
+			child.print_inode(recursive, spacing + "    ")
 
 
 	func print_inode_details(recursive:bool = false) -> void:
@@ -247,7 +256,12 @@ class iNode:
 		inode_string += "permissions:\n"
 		for permission in self.permissions:
 			inode_string += " - " + permission + ": " + self.permissions[permission] + "\n"
-		
+			
+		inode_string += "properties: "
+		for property in self.properties:
+			inode_string += property + ";"
+		inode_string += "\n"
+
 		inode_string += "content: " + self.content + "\n"
 		
 		inode_string += "children:\n"

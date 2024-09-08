@@ -1,6 +1,6 @@
 <telco name="telco1">
 	<users>
-		<user name="telco1" password="telco1" home="/home/telco1" path="/bin:/home/telco1" />
+		<user name="telco1" password="telco1" home="/home/telco1" path="/home/telco1" />
 		<user name="dialer" password="buzzard" home="/home/dialer" path="/bin:/home/dialer" />
 	</users>
 	<filesys>

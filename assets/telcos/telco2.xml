@@ -1,0 +1,82 @@
+<telco name="telco2">
+	<users>
+		<user name="telco2" password="fuzzing" home="/home/telco2" path="/bin:/home/telco2" />
+		<user name="dialer" password="buzzard" home="/home/dialer" path="/bin:/home/dialer" />
+	</users>
+	<filesys>
+		<inode name="" type="dir">
+			<inode name="bin" type="dir" permissions="dialer:r-x">
+				<inode name="dial" type="executable"></inode>
+			</inode>
+			<inode name="home" type="dir">
+				<inode name="telco2" type="dir" permissions="telco2:rw-">
+					<inode name="readme.txt" type="file">
+						To run the decryptor:
+						./decryptor &lt;encrypted_file&gt;
+					</inode>
+					<inode name="test.txt" type="file" properties="encrypted">
+						This was an encrypted message. You have now decrypted it.
+					</inode>
+					<inode name="decryptor" type="executable"></inode>
+					<inode name=".trash" type="dir">
+						<inode name="report.txt" type="file" properties="encrypted">
+							FROM: telco2@telco2
+							TO: management@telco7
+
+							I am pleased to report that the decryptor works as expected. That should buy us some time.
+
+							I've deployed the decryptor to telco7, but I'm keeping a local copy on telco2 for further development. Plus, there are some files here I'd like to secure.
+
+							Best,
+							telco2
+						</inode>
+					</inode>
+				</inode>
+				<inode name="dialer" type="dir" permissions="dialer:rw-">
+					<inode name="msg.txt" type="file">
+						FROM: management@telco7
+						TO: dialer@telco2
+
+						We have a new assignment for you.
+						TELCO needs a new decryptor -- somebody leaked our previous one...
+
+						Complete all work as telco2, the password is "fuzzing".
+
+						Best regards,
+						Management
+					</inode>
+				</inode>
+			</inode>
+			<inode name="library" type="dir" permissions="telco2:r--">
+				<inode name="telco_volume1.txt" type="file">
+					TELCO VOLUME 1: Company Mission
+
+					We connect the world.
+
+					TELCO's innovation has driven technological change for the better part of the past century. From our laboratories came the first transnational communication system, the first hyper-transistor, dozens of new programming languages, and the finest mathmaticians in the world.
+
+					We are pleased to welcome you into our ranks, and look forward to seeing you contribute to the TELCO family.
+
+					(end volume 1)
+				</inode>
+				<inode name="msg.txt" type="file">
+					----- BEGIN TRANSMISSION -----
+					ATTENTION TELCO PERSONNEL
+
+					Our proprietary decryptor has
+					appeared on a public forum.
+					Until the source of the breach is
+					identified, we are enacting
+					increased security measures.
+
+					If you see any suspicious
+					behavior, please report it to
+					management immediately.
+
+					-----  END TRANSMISSION  -----
+				</inode>
+				<inode name="contacts.txt" type="file" properties="encrypted">sysadmin:password123@telco3</inode>
+			</inode>
+		</inode>
+	</filesys>
+</telco>

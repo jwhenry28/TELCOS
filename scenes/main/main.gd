@@ -11,13 +11,13 @@ func _ready() -> void:
 	terminal = $"Terminal"
 	telcOS = $"OS"
 
-	telco_name = 'telco1'
+	telco_name = 'telco2'
 	telcOS.load_telco(telco_name)
 	print("main: done")
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if Input.is_action_just_released("cmd_enter"):
 		var cmd = terminal.consume_text()
 		terminal.add_to_history("> " + cmd)
