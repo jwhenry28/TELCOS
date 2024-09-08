@@ -11,7 +11,7 @@ func _ready() -> void:
 	terminal = $"Terminal"
 	telcOS = $"OS"
 
-	telco_name = 'telco2'
+	telco_name = 'telco1'
 	telcOS.load_telco(telco_name)
 	print("main: done")
 
