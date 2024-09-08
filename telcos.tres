@@ -1,0 +1,35 @@
+[gd_resource type="Theme" load_steps=4 format=3 uid="uid://jhgebuatp6es"]
+
+[ext_resource type="FontFile" uid="uid://bgadrxg0ccdgb" path="res://fonts/SFMonoRegular.otf" id="1_y5v3v"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_uewnl"]
+bg_color = Color(0.223529, 1, 0.0784314, 0.196078)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.223529, 1, 0.0784314, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6ajxf"]
+border_width_top = 12
+
+[resource]
+default_font = ExtResource("1_y5v3v")
+HBoxContainer/constants/separation = 7
+Label/colors/font_color = Color(0.223529, 1, 0.0784314, 1)
+Label/font_sizes/font_size = 12
+LineEdit/colors/font_color = Color(0.223529, 1, 0.0784314, 1)
+Panel/styles/panel = SubResource("StyleBoxFlat_uewnl")
+TextEdit/colors/background_color = Color(0.223529, 1, 0.0784314, 0)
+TextEdit/colors/caret_color = Color(0.223529, 1, 0.0784314, 1)
+TextEdit/colors/font_color = Color(0.223529, 1, 0.0784314, 1)
+TextEdit/colors/font_placeholder_color = Color(0.223529, 1, 0.0784314, 1)
+TextEdit/constants/caret_width = 8
+TextEdit/constants/line_spacing = -6
+TextEdit/font_sizes/font_size = 12
+TextEdit/styles/normal = SubResource("StyleBoxFlat_6ajxf")
+VBoxContainer/constants/separation = 4
