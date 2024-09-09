@@ -3,6 +3,7 @@
         <user name="telco3" password="power" home="/home/telco3" />
         <user name="sysadmin" password="password123" home="/home/sysadmin" />
     </users>
+	<shell builtins="help;whoami;users;pwd;ls;cd;cat;auth" guest="help;whoami;users;auth"></shell>
     <filesys>
         <inode name="" type="dir">
             <inode name="home" type="dir">

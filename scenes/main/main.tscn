@@ -1,13 +1,17 @@
-[gd_scene load_steps=6 format=3 uid="uid://dabc33oxpynev"]
+[gd_scene load_steps=7 format=3 uid="uid://dabc33oxpynev"]
 
 [ext_resource type="Script" path="res://scenes/main/main.gd" id="1_8xtc6"]
 [ext_resource type="FontFile" uid="uid://bgadrxg0ccdgb" path="res://fonts/SFMonoRegular.otf" id="1_wqm58"]
 [ext_resource type="PackedScene" uid="uid://dcu2kfgje6oqm" path="res://scenes/terminal/terminal.tscn" id="2_vjuq6"]
 [ext_resource type="Script" path="res://scenes/terminal/terminal.gd" id="3_2qah6"]
-[ext_resource type="PackedScene" uid="uid://dvq5dqvc2irvu" path="res://scenes/telcOS/telc_os.tscn" id="4_1jtnw"]
+[ext_resource type="PackedScene" uid="uid://bujr143jleqbn" path="res://telco_network.tscn" id="6_klq8m"]
+[ext_resource type="Script" path="res://scenes/main/signal_bus.gd" id="7_7iogf"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_8xtc6")
+
+[node name="SignalBus" type="Node" parent="."]
+script = ExtResource("7_7iogf")
 
 [node name="BlackBackground" type="ColorRect" parent="."]
 anchors_preset = 15
@@ -46,4 +50,4 @@ offset_top = 305.0
 offset_right = 1024.0
 offset_bottom = 548.0
 
-[node name="OS" parent="." instance=ExtResource("4_1jtnw")]
+[node name="TelcoNetwork" parent="." instance=ExtResource("6_klq8m")]

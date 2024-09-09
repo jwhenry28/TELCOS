@@ -11,6 +11,8 @@ var vbox_container
 var cmd_prompt_textedit
 var terminal_history_scrollbar
 
+var signal_bus
+
 var old_max_scroll_height = 0
 
 var terminal_history = [
@@ -25,7 +27,9 @@ func _ready() -> void:
 	vbox_container = $"TerminalHistory/VBoxContainer"
 	cmd_prompt_textedit = $"TerminalHistory/VBoxContainer/HBoxContainer/CmdPrompt"
 	terminal_history_scrollbar = $"TerminalHistory".get_v_scroll_bar()
-	
+	signal_bus = $"../SignalBus"
+	signal_bus.telco_stdout.connect(add_to_history)
+
 	last_sibling_index = vbox_container.get_child_count() - 2
 	
 	for item in terminal_history:
@@ -35,7 +39,7 @@ func _ready() -> void:
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if old_max_scroll_height < terminal_history_scrollbar.max_value:
 		adjust_scrollbar()
 		old_max_scroll_height = terminal_history_scrollbar.max_value
@@ -63,8 +67,3 @@ func add_to_history(text: String) -> void:
 	var last_sibling = vbox_container.get_child(last_sibling_index)
 	last_sibling_index += 1
 	last_sibling.add_sibling(label)
-
-
-func run_cmd(cmd) -> void:
-	var output = "(cmd output)"
-	add_to_history(output)

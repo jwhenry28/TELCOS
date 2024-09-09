@@ -35,9 +35,23 @@ func get_child(child_name:String):
 	return null
 
 
+func get_content() -> String:
+	if type == 'file':
+		return self.content
+	
+	return ""
+
+
+func get_executable() -> String:
+	if type == 'executable':
+		return self.content
+
+	return ""
+
+
 func set_content(new_content:String) -> void:
 	# TODO: use return type instead if this becomes irritating
-	assert(type == 'file', "Only files can have content")
+	assert(type == 'file' or type == 'executable', "Only files can have content")
 
 	# hack - this will prevent me from having tabs in the file contents.
 	# I'll figure out how to strip leading tabs from the XML file if this 
@@ -55,8 +69,26 @@ func get_user_permissions(username:String):
 	return "---"
 
 
+func verify_permissions(username:String, permission:String):
+	assert(permission == "r" or permission == "w" or permission == "x", "Invalid permission: " + permission)
+	
+	print("verifying permission '" + permission + "' for " + username + " on " + self.name)
+
+	var user_permissions = get_user_permissions(username)
+	var permission_bit = ""
+	match permission:
+		"r":
+			permission_bit = user_permissions[0]
+		"w":
+			permission_bit = user_permissions[1]
+		"x":
+			permission_bit = user_permissions[2]
+
+	return permission_bit == permission
+
+
 func print_inode(recursive:bool = false, spacing:String = "") -> void:
-	print(spacing + self.name + " (" + self.type + ")")
+	print(spacing + "/" + self.name + " (" + self.type + ")")
 	for child in self.children:
 		child.print_inode(recursive, spacing + "    ")
 
@@ -76,7 +108,7 @@ func _to_string() -> String:
 
 	inode_string += "properties: "
 	for property in self.properties:
-		inode_string += property + "=" + self.properties[property] + ";"
+		inode_string += property + "=" + str(self.properties[property]) + ";"
 	inode_string += "\n"
 
 	inode_string += "content: " + self.content + "\n"

@@ -3,6 +3,7 @@
 		<user name="telco2" password="fuzzing" home="/home/telco2" path="/bin:/home/telco2" />
 		<user name="dialer" password="buzzard" home="/home/dialer" path="/bin:/home/dialer" />
 	</users>
+	<shell builtins="help;whoami;users;pwd;ls;cd;cat;auth" guest="help;whoami;users;auth"></shell>
 	<filesys>
 		<inode name="" type="dir">
 			<inode name="bin" type="dir" permissions="dialer:r-x">

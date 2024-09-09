@@ -1,41 +1,70 @@
-extends Node
+class_name TelcOS extends Node
+
+enum TelcoState {
+	RUNNING,
+	CONNECTING,
+	DISCONNECTED
+}
 
 var telco_name: String
 var users: Array[User]
 var filesys: iNode
 var session: Session
-
+var shell: Shell
+var signal_bus: Node
+var telco_state: TelcoState
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	print("telcOS: loading")
 	print("telcOS: done")
-	session = Session.new()
+
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	pass
+func _process(_delta: float) -> void:
+	match telco_state:
+		TelcoState.CONNECTING:
+			pass
+		TelcoState.RUNNING:
+			pass
+		TelcoState.DISCONNECTED:
+			pass
 
 
-func initialize_telco(new_telco_name: String, username: String = "", cwd: String = "/") -> void:
+func initialize_telco(new_telco_name: String) -> void:
 	telco_name = new_telco_name
+	session = Session.new()
+	shell = Shell.new()
+	signal_bus = get_node("../../SignalBus")
+	signal_bus.network_data.connect(receive_network_data)
+	telco_state = TelcoState.RUNNING
+
 	load_telco_xml(telco_name)
-	print('\n\n\nTELCO LOADED. Sanity check:')
+	print("\n\n\n" + telco_name.to_upper() + " LOADED. Sanity check:")
 	print("name: ", telco_name)
 	print("users: ", users)
-	print("FILESYSTEM:")
+	print("shell: ", shell)
+	print("- builtins: ", shell.builtin_commands)
+	print("- guest: ", shell.guest_commands)
+	print(telco_name + " FILESYSTEM:")
 	filesys.print_inode(true)
 	filesys.print_inode_details(true)
 
+
+func initialize_session(username: String, cwd: String = "") -> void:
 	var user_present = false
 	for user in users:
 		if user.username == username:
 			user_present = true
 			break
-	assert(user_present, "User: " + username + " not found")
-
-	session.username = username
-	session.cwd = cwd
+	
+	assert(user_present, "User: " + username + " not found in " + telco_name)
+	
 	session.user = get_user_from_username(username)
+	session.username = username
+	if cwd == "":
+		session.cwd = session.user.home
+	else:
+		session.cwd = cwd
 
 
 func load_telco_xml(new_telco_name: String) -> void:
@@ -69,6 +98,14 @@ func load_telco_xml(new_telco_name: String) -> void:
 							attributes_dict.get('home', ''), 
 							attributes_dict.get('path', '')
 						))
+					'shell':
+						print(shell == null)
+						var builtins = attributes_dict.get('builtins', '').split(';')
+						var guest = attributes_dict.get('guest', '').split(';')
+						print("builtins: ", builtins)
+						print("guest: ", guest)
+						shell.assign_builtin_cmds(builtins)
+						shell.assign_guest_cmds(guest)
 					'filesys':
 						pass
 					'inode':
@@ -171,43 +208,55 @@ func add_to_filesystem(file_path:String, inode:iNode) -> bool:
 
 
 func path_to_absolute(file_path:String):
+	print("path_to_absolute: ", file_path)
+	
 	var full_path = ""
 	if file_path.begins_with('/'):
 		full_path = file_path
 	else:
 		full_path = session.cwd + '/' + file_path
+
+	full_path = full_path.strip_edges(true, true)
+	while full_path.find("//") != -1:
+		full_path = full_path.replace("//", "/")
+	if full_path.length() > 1 and full_path.ends_with('/'):
+		full_path = full_path.trim_suffix('/')
 	
+	print("cleaned file path: ", full_path)
+	
+	print("full path: ", full_path)
 	var path_parts = full_path.split('/')
 	print("path_parts: ", path_parts)
 	var absolute_path_parts = []
 	for part in path_parts:
 		if part == "..":
 			absolute_path_parts.pop_back()
+		elif part == ".":
+			continue
 		else:
 			absolute_path_parts.append(part)
 	
+	if absolute_path_parts.size() == 0:
+		return "/"
+	if absolute_path_parts.size() == 1:
+		return "/" + absolute_path_parts[0]
 	print("absolute_path_parts: ", absolute_path_parts)
-	var size = absolute_path_parts.size()
-	if size > 2 and absolute_path_parts[size - 1] == "":
-		# trailing slash
-		absolute_path_parts.pop_back()
-	
 	return "/".join(absolute_path_parts)
 
 
 func get_inode_from_path(file_path:String):
+	print("get_inode_from_path: ", file_path)
 	assert(filesys != null, "Filesystem not loaded")
 
-	print("retrieving inode: ", file_path)
-	var file_path_array = file_path.split('/')
-	file_path_array.remove_at(0)
-
-	print(file_path_array)
-	if file_path_array.size() == 1 and file_path_array[0] == "":
+	if file_path == "/":
+		print("returning root")
 		return filesys
 
+	var file_path_array = file_path.split('/')
+	print("file_path_array: ", 	file_path_array)
+
 	var current_node = filesys
-	for dir in file_path_array:
+	for dir in file_path_array.slice(1):
 		print("looking for: ", dir)
 		current_node = current_node.get_child(dir)
 		
@@ -233,14 +282,29 @@ func run_cmd(cmd_string: String) -> CmdIO:
 	var argv = cmd_args.slice(1)
 	print("argv: ", argv)
 
-
 	var io = CmdIO.new()
 
-	if COMMANDS.has(cmd):
-		COMMANDS[cmd].callback.call(cmd, argv, io)
-	else:
-		io.set_return_code(1)
-		io.log(cmd + ": command not found")
+	var user_commands = get_user_commands(session.username)
+	if user_commands.has(cmd):
+		BINARIES[cmd].callback.call(cmd, argv, io)
+		return io
+
+	var executables = get_user_executables(session.username)
+	for exe in executables:
+		if exe.name == cmd:
+			cmd = exe.get_executable()
+			BINARIES[cmd].callback.call(cmd, argv, io)
+			return io
+
+	var absolute_path = path_to_absolute(cmd)
+	var executable_inode = get_inode_from_path(absolute_path)
+	if executable_inode != null:
+		cmd = executable_inode.get_executable()
+		BINARIES[cmd].callback.call(cmd, argv, io)
+		return io
+
+	io.set_return_code(1)
+	print_stdout(cmd + ": command not found")
 
 	return io
 
@@ -256,8 +320,70 @@ func authenticate_user(username: String, password: String) -> bool:
 	return false
 
 
-var COMMANDS: Dictionary = {
-	"help": Cmd.new("help", "Prints this message to the console", help_cmd),
+func get_user_executables(username: String) -> Array[iNode]:
+	print("getting user executables for " + username)
+	if username == "":
+		print("user is guest")
+		return []
+	
+	var executables: Array[iNode] = []
+	var path = session.user.path
+	var path_array = path.split(':')
+	for dir in path_array:
+		var dir_inode = get_inode_from_path(dir)
+		if dir_inode == null or !dir_inode.verify_permissions(username, "r"):
+			continue
+		for child in dir_inode.children:
+			print("child: ", child.name)
+			if child.type == "executable" and child.verify_permissions(username, "x"):
+				executables.append(child)
+
+	return executables
+
+
+func get_user_commands(username: String) -> Array[String]:
+	var commands = []
+	if username == "":
+		commands = shell.guest_commands
+	else:
+		commands = shell.builtin_commands
+	
+	return commands
+
+
+func print_stdout(msg: String) -> void:
+	signal_bus.telco_stdout.emit(msg)
+
+
+func send_network_data(source: String, destination: String, data: String) -> void:
+	signal_bus.network_data.emit(source, destination, data)
+
+
+func receive_network_data(source: String, destination: String, data: String) -> void:
+	print(telco_name + ": received network data from: ", source, " to: ", destination, " data: ", data)
+	if destination != telco_name:
+		return	
+
+	if data.begins_with("dial "):
+		print("received dial")
+		var dial_data = data.split(" ")
+		var auth_string = dial_data[1]
+		var username = auth_string.split(":")[0]
+		var tmp = auth_string.split(":")[1]
+		var password = tmp.split("@")[0]
+		var telco_name = tmp.split("@")[1]
+
+		if authenticate_user(username, password):
+			print("authenticated user: ", username)
+			signal_bus.change_telco.emit(telco_name, username)
+			signal_bus.telco_stdout.emit(telco_name + ": welcome " + username + "!")
+		else:
+			print("failed to authenticate user: ", username)
+	
+
+
+var BINARIES: Dictionary = {
+	"help": Cmd.new("help", "Prints accessible commands to the console", help_cmd),
 	"whoami": Cmd.new("whoami", "Displays the current user", whoami_cmd),
 	"users": Cmd.new("users", "Lists system users", users_cmd),
 	"pwd": Cmd.new("pwd", "Displays the current working directory", pwd_cmd),
@@ -265,56 +391,66 @@ var COMMANDS: Dictionary = {
 	"cd": Cmd.new("cd", "Changes the current working directory", cd_cmd),
 	"cat": Cmd.new("cat", "Prints the content of a file", cat_cmd),
 	"auth": Cmd.new("auth", "Authenticates the user", auth_cmd),
-	"dial": Cmd.new("dial", "Dial a new telco", dial_cmd),
+	"dial_standard": Cmd.new("dial", "Dial a new telco", dial_executable),
 }
 
 
-func help_cmd(_cmd: String, _args: Array, io: CmdIO):
+func help_cmd(_cmd: String, _argv: Array, io: CmdIO):
 	var msg = ""
-	for cmd in COMMANDS:
-		msg += COMMANDS[cmd].name.to_upper() + ": " + COMMANDS[cmd].help + "\n"
-	io.log(msg)
+	var commands = get_user_commands(session.username)
+	var executables = get_user_executables(session.username)
+
+	for cmd in commands:
+		msg += BINARIES[cmd].name.to_upper() + ": " + BINARIES[cmd].help + "\n"
+	
+	for exe in executables:
+		var executable_key = exe.get_executable()
+		assert (executable_key != "", "Executable key not found")
+		msg += exe.name.to_upper() + ": " + BINARIES[executable_key].help + "\n"
+	
+
+	print_stdout(msg)
 
 
-func whoami_cmd(_cmd: String, _args: Array, io: CmdIO):
+func whoami_cmd(_cmd: String, _argv: Array, io: CmdIO):
 	var msg = ""
 	if session.username == "":
 		msg = "guest@" + telco_name + " (unauthenticated)"
 	else:
 		msg = session.username + "@" + telco_name
-	io.log(msg)
+	print_stdout(msg)
 
 
-func users_cmd(_cmd: String, _args: Array, io: CmdIO):
+func users_cmd(_cmd: String, _argv: Array, io: CmdIO):
 	var msg = ""
 	for user in users:
 		msg += user.username + "\n"
-	io.log(msg, "")
+	print_stdout(msg)
 
 
-func pwd_cmd(_cmd: String, _args: Array, io: CmdIO):
-	io.log(session.cwd)
+func pwd_cmd(_cmd: String, _argv: Array, io: CmdIO):
+	print_stdout(session.cwd)
 
 
-func ls_cmd(_cmd: String, args: Array, io: CmdIO):
+func ls_cmd(_cmd: String, argv: Array, io: CmdIO):
 	var path = ""
 	var verbose = false
 
-	if args.size() == 0:
+	if argv.size() == 0:
 		print("no args, using cwd")
 		path = session.cwd
-	elif args.size() == 1:
-		if args[0].begins_with('-'):
+	elif argv.size() == 1:
+		if argv[0].begins_with('-'):
 			print("no args, using cwd with flag")
-			verbose = args[0] == '-l'
+			verbose = argv[0] == '-l'
 			path = session.cwd
 		else:
-			print("path arg: ", args[0])
-			path = args[0]
-	elif args.size() == 2:
-		print("path and flag: ", args[0], args[1])
-		verbose = args[0] == '-l'
-		path = args[1]
+			print("path arg: ", argv[0])
+			path = argv[0]
+	elif argv.size() == 2:
+		print("path and flag: ", argv[0], argv[1])
+		verbose = argv[0] == '-l'
+		path = argv[1]
 	print("path: ", path)
 	
 	var absolute_path = path_to_absolute(path)
@@ -323,37 +459,39 @@ func ls_cmd(_cmd: String, args: Array, io: CmdIO):
 	var target_inode = get_inode_from_path(absolute_path)
 	if target_inode == null:
 		io.set_return_code(1)
-		io.log("no such file or directory: " + path)
+		print_stdout("no such file or directory: " + path)
 		return
 
-	var user_permissions = target_inode.get_user_permissions(session.username)
-	var permissions = user_permissions.split("")
-
-	if permissions[0] != "r":
+	if !target_inode.verify_permissions(session.username, "r"):
 		io.set_return_code(1)
-		io.log("permission denied: " + path)
+		print_stdout("permission denied: " + path)
 		return
 
 	if target_inode.type == "dir":
 		for child in target_inode.children:
 			if verbose:
-				user_permissions = child.get_user_permissions(session.username)
-				io.log("-" + user_permissions + " " + child.name)
+				var user_permissions = child.get_user_permissions(session.username)
+				print_stdout("-" + user_permissions + " " + child.name)
 			else:
-				io.log(child.name)
+				print_stdout(child.name)
 	else:
 		if verbose:
-			io.log("-" + user_permissions + " " + target_inode.name)
+			var user_permissions = target_inode.get_user_permissions(session.username)
+			print_stdout("-" + user_permissions + " " + target_inode.name)
 		else:
-			io.log(target_inode.name)
+			print_stdout(target_inode.name)
 
 
-func cd_cmd(_cmd: String, args: Array, io: CmdIO):
+func cd_cmd(_cmd: String, argv: Array, io: CmdIO):
 	var path = ""
-	if args.size() == 0:
+	if argv.size() == 0:
+		if session.user == null or session.user.home == "":
+			io.set_return_code(1)
+			print_stdout("no home dir set")
+			return
 		path = session.user.home
-	elif args.size() == 1:
-		path = args[0]
+	elif argv.size() == 1:
+		path = argv[0]
 
 	var absolute_path = path_to_absolute(path)
 	print("absolute_path: ", absolute_path)
@@ -361,75 +499,88 @@ func cd_cmd(_cmd: String, args: Array, io: CmdIO):
 	var target_inode = get_inode_from_path(absolute_path)
 	if target_inode == null:
 		io.set_return_code(1)
-		io.log("no such file or directory")
+		print_stdout("no such file or directory")
 		return
 
-	var user_permissions = target_inode.get_user_permissions(session.username)
-	var permissions = user_permissions.split("")
-	
-	if permissions[0] != "r":
+	if !target_inode.verify_permissions(session.username, "r"):
 		io.set_return_code(1)
-		io.log("permission denied")
+		print_stdout("permission denied")
 		return
 
 	if target_inode.type == "dir":
 		session.cwd = absolute_path
 	else:
 		io.set_return_code(1)
-		io.log("not a directory")
+		print_stdout("not a directory")
 
 
-func cat_cmd(cmd: String, args: Array, io: CmdIO):
-	if args.size() != 1:
+func cat_cmd(cmd: String, argv: Array, io: CmdIO):
+	if argv.size() != 1:
 		io.set_return_code(1)
-		io.log("usage: " + cmd + " <path>")
+		print_stdout("usage: " + cmd + " <path>")
 		return
 	
-	var path = args[0]
+	var path = argv[0]
 	var absolute_path = path_to_absolute(path)
 	print("absolute_path: ", absolute_path)
 
 	var target_inode = get_inode_from_path(absolute_path)
 	if target_inode == null:
 		io.set_return_code(1)
-		io.log("no such file or directory")
+		print_stdout("no such file or directory")
 		return
-
-	var user_permissions = target_inode.get_user_permissions(session.username)
-	var permissions = user_permissions.split("")
 	
-	if permissions[0] != "r":
+	if !target_inode.verify_permissions(session.username, "r"):
 		io.set_return_code(1)
-		io.log("permission denied")
+		print_stdout("permission denied")
 		return
 
 	if target_inode.type == "file":
-		io.log(target_inode.content)
+		print_stdout(target_inode.get_content())
 	else:
 		io.set_return_code(1)
-		io.log("not a file")
+		print_stdout("not a file")
 
 
-func auth_cmd(cmd: String, args: Array, io: CmdIO):
-	if args.size() < 1 or args[0].find(":") == -1:
+func auth_cmd(cmd: String, argv: Array, io: CmdIO):
+	if argv.size() < 1 or argv[0].find(":") == -1:
 		io.set_return_code(1)
-		io.log("usage: " + cmd + " <username>:<password>")
+		print_stdout("usage: " + cmd + " <username>:<password>")
 		return
 	
-	var auth_string = args[0]
+	var auth_string = argv[0]
 	var username = auth_string.split(':')[0]
 	var password = auth_string.split(':')[1]
 
 	if !authenticate_user(username, password):
 		io.set_return_code(1)
-		io.log("invalid credentials")
+		print_stdout("invalid credentials")
 		return
 	
-	io.log("welcome, " + session.username + "!")
+	print_stdout("welcome, " + session.username + "!")
 	session.username = username
 	session.user = get_user_from_username(username)
 	session.cwd = session.user.home
 
 
-func dial_cmd(cmd: String, args: Array, io: CmdIO):
-	pass
+func dial_executable(_cmd: String, argv: Array, io: CmdIO):
+	print("dial start")
+	if argv.size() != 1:
+		io.set_return_code(1)
+		print_stdout("no telco name provided")
+		return
+	
+	var auth_string = argv[0]
+
+	if auth_string.find(":") == -1 or auth_string.find("@") == -1:
+		auth_string = session.username + ":" + session.user.password + "@" + argv[0]
+	
+	print(auth_string)
+	var dst_telco = auth_string.split("@")[1]
+	var data = "dial " + auth_string
+
+	print("dialing telco: ", dst_telco)
+
+	send_network_data(telco_name, dst_telco, data)
+	telco_state = TelcoState.CONNECTING
+	print_stdout("dialing...")
