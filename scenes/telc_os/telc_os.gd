@@ -263,26 +263,18 @@ func path_to_absolute(file_path:String):
 
 
 func get_inode_from_path(file_path:String):
-	print("get_inode_from_path: ", file_path)
 	assert(filesys != null, "Filesystem not loaded")
 
 	if file_path == "/":
-		print("returning root")
 		return filesys.get_root_node()
 
 	var file_path_array = file_path.split('/')
-	print("file_path_array: ", 	file_path_array)
-
 	var current_node = filesys.get_root_node()
 	for dir in file_path_array.slice(1):
-		print("looking for '", dir, "' in '", current_node.filename, "'")
 		current_node = current_node.get_child_inode(dir)
-		
 		if current_node == null:
-			print("not found")
 			return null
 
-	print("found: ", current_node.filename)
 	return current_node
 
 
@@ -291,43 +283,6 @@ func get_user_from_username(username: String) -> User:
 		if user.username == username:
 			return user
 	return null
-
-
-func run_cmd(cmd_string: String) -> void:
-	print("running command: ", cmd_string)
-	var cmd_args = cmd_string.split(' ')
-	print("cmd_args: ", cmd_args)
-	var cmd = cmd_args[0]
-	print("cmd: ", cmd)
-	var argv = cmd_args.slice(1)
-	print("argv: ", argv)
-
-	var user_commands = get_user_commands(session.get_username())
-	print("checking builtins")
-	if user_commands.has(cmd):
-		print("running builtin")
-		BINARIES[cmd].callback.call(cmd, argv)
-		return
-
-	var executables = get_user_executables(session.get_username())
-	print("checking executables")
-	for exe in executables:
-		if exe.filename == cmd:
-			print("running executable")
-			cmd = exe.get_executable()
-			BINARIES[cmd].callback.call(cmd, argv)
-			return
-
-	var absolute_path = path_to_absolute(cmd)
-	var executable_inode = get_inode_from_path(absolute_path)
-	print("checking absolute filepath")
-	if executable_inode != null and BINARIES.has(executable_inode.get_executable()):
-		print("running executable from absolute filepath")
-		cmd = executable_inode.get_executable()
-		BINARIES[cmd].callback.call(cmd, argv)
-		return
-
-	stdout(cmd + ": command not found")
 
 
 func authenticate_user(username: String, password: String) -> bool:
@@ -389,22 +344,52 @@ func receive_network_data(source: String, destination: String, data: String) -> 
 	if destination != telco_name:
 		return	
 
-	if data.begins_with("dial "):
-		print("received dial")
-		var dial_data = data.split(" ")
-		var auth_string = dial_data[1]
-		var username = auth_string.split(":")[0]
-		var tmp = auth_string.split(":")[1]
-		var password = tmp.split("@")[0]
-		var auth_telco_name = tmp.split("@")[1]
+	run_cmd(data, true)
 
-		if authenticate_user(username, password):
-			print("authenticated user: ", username)
-			signal_bus.change_telco.emit(auth_telco_name, username)
-			signal_bus.telco_stdout.emit(auth_telco_name + ": welcome " + username + "!")
+
+func run_cmd(cmd_string: String, is_network_cmd: bool = false) -> void:
+	print("running command: ", cmd_string)
+	var cmd_args = cmd_string.split(' ')
+	print("cmd_args: ", cmd_args)
+	var cmd = cmd_args[0]
+	print("cmd: ", cmd)
+	var argv = cmd_args.slice(1)
+	print("argv: ", argv)
+
+	# TODO: not a good long-term way to do this
+	if is_network_cmd:
+		if BINARIES.has(cmd):
+			BINARIES[cmd].callback.call(cmd, argv)
+			return
 		else:
-			print("failed to authenticate user: ", username)
-	
+			return
+
+	var user_commands = get_user_commands(session.get_username())
+	print("checking builtins")
+	if user_commands.has(cmd):
+		print("running builtin")
+		BINARIES[cmd].callback.call(cmd, argv)
+		return
+
+	var executables = get_user_executables(session.get_username())
+	print("checking executables")
+	for exe in executables:
+		if exe.filename == cmd:
+			print("running executable")
+			cmd = exe.get_executable()
+			BINARIES[cmd].callback.call(cmd, argv)
+			return
+
+	var absolute_path = path_to_absolute(cmd)
+	var executable_inode = get_inode_from_path(absolute_path)
+	print("checking absolute filepath")
+	if executable_inode != null and BINARIES.has(executable_inode.get_executable()):
+		print("running executable from absolute filepath")
+		cmd = executable_inode.get_executable()
+		BINARIES[cmd].callback.call(cmd, argv)
+		return
+
+	stdout(cmd + ": command not found")
 
 
 var BINARIES: Dictionary = {
@@ -417,6 +402,7 @@ var BINARIES: Dictionary = {
 	"cat": Cmd.new("cat", "Prints the content of a file", cat_cmd),
 	"auth": Cmd.new("auth", "Authenticates the user", auth_cmd),
 	"dial_standard": Cmd.new("dial", "Dial a new telco", dial_executable),
+	"dial_received": Cmd.new("dial_received", "Dial a new telco", dial_received),
 }
 
 
@@ -601,10 +587,25 @@ func dial_executable(_cmd: String, argv: Array):
 	
 	print(auth_string)
 	var dst_telco = auth_string.split("@")[1]
-	var data = "dial " + auth_string
+	var data = "dial_received " + auth_string
 
 	print("dialing telco: ", dst_telco)
 
+	stdout("dialing...")
 	send_network_data(telco_name, dst_telco, data)
 	telco_state = TelcoState.CONNECTING
-	stdout("dialing...")
+
+
+func dial_received(_cmd: String, argv: Array):
+	var auth_string = argv[0]
+	var username = auth_string.split(":")[0]
+	var tmp = auth_string.split(":")[1]
+	var password = tmp.split("@")[0]
+	var auth_telco_name = tmp.split("@")[1]
+
+	if authenticate_user(username, password):
+		print("authenticated user: ", username)
+		signal_bus.change_telco.emit(auth_telco_name, username)
+		signal_bus.telco_stdout.emit(auth_telco_name + ": welcome " + username + "!")
+	else:
+		print("failed to authenticate user: ", username)
