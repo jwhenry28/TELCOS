@@ -1,5 +1,6 @@
 class_name TelcOS extends Node
 
+
 enum TelcoState {
 	RUNNING,
 	CONNECTING,
@@ -28,6 +29,8 @@ var telco_state: TelcoState
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	print("telcOS: loading")
+	filesys = $"FileSystem"
+	print("filesys type: ", filesys.get_class())
 	print("telcOS: done")
 
 
@@ -58,8 +61,8 @@ func initialize_telco(new_telco_name: String) -> void:
 	print("- builtins: ", shell.builtin_commands)
 	print("- guest: ", shell.guest_commands)
 	print(telco_name + " FILESYSTEM:")
-	filesys.print_inode(true)
-	filesys.print_inode_details(true)
+	filesys.get_tree_string_pretty()
+	filesys.get_root_node().print_inode_details(true)
 
 
 func initialize_session(username: String, cwd: String = "") -> void:
@@ -104,12 +107,14 @@ func load_telco_xml(new_telco_name: String) -> void:
 						pass
 					'user':
 						print("adding user: ", attributes_dict.get('name', ''))
-						users.append(User.new(
+						var new_user:User = User.new()
+						new_user.initialize(
 							attributes_dict.get('name', ''), 
 							attributes_dict.get('password', ''), 
 							attributes_dict.get('home', ''), 
 							attributes_dict.get('path', '')
-						))
+						)
+						users.append(new_user)
 					'shell':
 						print(shell == null)
 						var builtins = attributes_dict.get('builtins', '').split(';')
@@ -128,8 +133,8 @@ func load_telco_xml(new_telco_name: String) -> void:
 
 						assert (file_name != null and file_type != null, "iNode name and type cannot be empty")
 
-						if file_name != "":
-							file_path += '/' + file_name
+						file_path += '/' + file_name
+						file_path = file_path.replace("//", "/")
 
 						print("file path: ", file_path)
 						var file_permissions = {}
@@ -172,12 +177,18 @@ func load_telco_xml(new_telco_name: String) -> void:
 							print("parsing: ", property)
 							file_properties[property_name] = property_value
 
-						var new_inode = iNode.new(file_path, file_name, file_type, file_permissions, file_properties)
-						print("adding inode: " + file_name)
-						var res = add_to_filesystem(file_path, new_inode)
-						assert (res, "Failed to add inode to filesystem")
+						if file_path == "/":
+							print("initializing filesystem")
+							filesys.initialize_filesystem(file_permissions, file_properties)
+							current_inode = filesys.get_root_node()
+						else:
+							print("creating inode: ", file_name)
+							var new_inode = iNode.new()
+							new_inode.initialize(file_name, file_type, file_permissions, file_properties)
+							print("adding inode: " + file_name)
+							add_to_filesystem(file_path, new_inode)
 
-						current_inode = new_inode
+							current_inode = new_inode
 			
 			XMLParser.NODE_TEXT:
 				var content = parser.get_node_data().strip_edges(true, true)
@@ -199,22 +210,17 @@ func load_telco_xml(new_telco_name: String) -> void:
 
 
 func add_to_filesystem(file_path:String, inode:iNode) -> bool:
-	if filesys == null:
-		print("adding root")
-		filesys = inode
-		return true
-
 	var file_path_array = file_path.split('/')
-	file_path_array = file_path_array.slice(1, file_path_array.size() - 1)
-	var current_node = filesys
-	for dir in file_path_array:
-		print("looking for: ", dir)
+	var current_node = filesys.get_root_node()
+	
+	for dir in file_path_array.slice(1, file_path_array.size() - 1):
+		print("looking for '", dir, "' in '", current_node.name, "'")
 		var child_name = dir
 		current_node = current_node.get_child_inode(child_name)
-		
+
 		if current_node == null:
 			return false
-	
+
 	current_node.add_child_inode(inode)
 	return true
 
@@ -256,26 +262,27 @@ func path_to_absolute(file_path:String):
 	return "/".join(absolute_path_parts)
 
 
-# TODO: explore using node structure to retrieve children instead of nested arrays
 func get_inode_from_path(file_path:String):
 	print("get_inode_from_path: ", file_path)
 	assert(filesys != null, "Filesystem not loaded")
 
 	if file_path == "/":
 		print("returning root")
-		return filesys
+		return filesys.get_root_node()
 
 	var file_path_array = file_path.split('/')
 	print("file_path_array: ", 	file_path_array)
 
-	var current_node = filesys
+	var current_node = filesys.get_root_node()
 	for dir in file_path_array.slice(1):
-		print("looking for: ", dir)
+		print("looking for '", dir, "' in '", current_node.filename, "'")
 		current_node = current_node.get_child_inode(dir)
 		
 		if current_node == null:
+			print("not found")
 			return null
 
+	print("found: ", current_node.filename)
 	return current_node
 
 
@@ -296,20 +303,26 @@ func run_cmd(cmd_string: String) -> void:
 	print("argv: ", argv)
 
 	var user_commands = get_user_commands(session.get_username())
+	print("checking builtins")
 	if user_commands.has(cmd):
+		print("running builtin")
 		BINARIES[cmd].callback.call(cmd, argv)
 		return
 
 	var executables = get_user_executables(session.get_username())
+	print("checking executables")
 	for exe in executables:
 		if exe.filename == cmd:
+			print("running executable")
 			cmd = exe.get_executable()
 			BINARIES[cmd].callback.call(cmd, argv)
 			return
 
 	var absolute_path = path_to_absolute(cmd)
 	var executable_inode = get_inode_from_path(absolute_path)
-	if executable_inode != null and BINARIES.has(executable_inode.filename):
+	print("checking absolute filepath")
+	if executable_inode != null and BINARIES.has(executable_inode.get_executable()):
+		print("running executable from absolute filepath")
 		cmd = executable_inode.get_executable()
 		BINARIES[cmd].callback.call(cmd, argv)
 		return
@@ -341,7 +354,7 @@ func get_user_executables(username: String) -> Array[iNode]:
 		var dir_inode = get_inode_from_path(dir)
 		if dir_inode == null or !dir_inode.verify_permissions(username, "r"):
 			continue
-		for child in dir_inode.children:
+		for child in dir_inode.get_children():
 			print("child: ", child.filename)
 			if child.type == "executable" and child.verify_permissions(username, "x"):
 				executables.append(child)
@@ -383,12 +396,12 @@ func receive_network_data(source: String, destination: String, data: String) -> 
 		var username = auth_string.split(":")[0]
 		var tmp = auth_string.split(":")[1]
 		var password = tmp.split("@")[0]
-		var telco_name = tmp.split("@")[1]
+		var auth_telco_name = tmp.split("@")[1]
 
 		if authenticate_user(username, password):
 			print("authenticated user: ", username)
-			signal_bus.change_telco.emit(telco_name, username)
-			signal_bus.telco_stdout.emit(telco_name + ": welcome " + username + "!")
+			signal_bus.change_telco.emit(auth_telco_name, username)
+			signal_bus.telco_stdout.emit(auth_telco_name + ": welcome " + username + "!")
 		else:
 			print("failed to authenticate user: ", username)
 	
@@ -481,7 +494,7 @@ func ls_cmd(_cmd: String, argv: Array):
 		return
 
 	if target_inode.type == "dir":
-		for child in target_inode.children:
+		for child in target_inode.get_children():
 			if verbose:
 				var user_permissions = child.get_user_permissions(session.get_username())
 				stdout("-" + user_permissions + " " + child.filename)

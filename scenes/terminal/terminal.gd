@@ -5,7 +5,7 @@ var BG_TERMINAL_GREEN: Color = Color8(11, 50, 4, 255)
 var FONT_SIZE: int = 12
 
 var last_sibling_index: int
-var old_max_scroll_height: int = 0
+var old_max_scroll_height: float = 0.0
 
 var terminal_history_container: ScrollContainer
 var vbox_container: VBoxContainer

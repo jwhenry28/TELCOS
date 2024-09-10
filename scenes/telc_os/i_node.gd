@@ -5,12 +5,15 @@ var filename: String
 var type: String
 var permissions: Dictionary
 var content: String
-var children: Array[iNode]
+# var children: Array[iNode]
 var properties: Dictionary
 
 
-func _init(absolute_filename:String,new_filename:String, new_type:String, new_permissions:Dictionary = {}, new_properties:Dictionary = {}):
-	self.name = absolute_filename
+func initialize(new_filename:String, new_type:String, new_permissions:Dictionary = {}, new_properties:Dictionary = {}, is_root_node:bool = false):
+	if !is_root_node:
+		self.name = new_filename.md5_text()
+	else:
+		self.name = new_filename
 	self.filename = new_filename
 	self.type = new_type
 
@@ -18,22 +21,26 @@ func _init(absolute_filename:String,new_filename:String, new_type:String, new_pe
 		new_permissions = {'*': 'rwx'}
 
 	self.permissions = new_permissions
-	self.children = []
+	# self.children = []
 	self.properties = new_properties
+
+
+func _ready() -> void:
+	print("iNode: ready")
+
+
+func _process(_delta: float) -> void:
+	pass
 
 
 func add_child_inode(new_child:iNode) -> void:
 	# TODO: use return type instead if this becomes irritating
 	assert(type == 'dir', "Only directories can have children") 
-	self.children.append(new_child)
+	add_child(new_child)
 
 
 func get_child_inode(child_name:String):
-	for child in self.children:
-		print("checking child: ", child.filename)
-		if child.filename == child_name:
-			return child
-	return null
+	return get_node(child_name.md5_text())
 
 
 func get_content() -> String:
@@ -90,14 +97,14 @@ func verify_permissions(username:String, permission:String):
 
 func print_inode(recursive:bool = false, spacing:String = "") -> void:
 	print(spacing + "/" + self.filename + " (" + self.type + ")")
-	for child in self.children:
+	for child in get_children():
 		child.print_inode(recursive, spacing + "    ")
 
 
 func print_inode_details(recursive:bool = false) -> void:
 	print(self._to_string())
 	if recursive:
-		for child in self.children:
+		for child in get_children():
 			child.print_inode_details(recursive)
 
 
@@ -115,7 +122,7 @@ func _to_string() -> String:
 	inode_string += "content: " + self.content + "\n"
 	
 	inode_string += "children:\n"
-	for child in self.children:
+	for child in get_children():
 		inode_string += " - " + child.filename + " (" + child.type + ")" + "\n"
 
 	return inode_string

@@ -10,10 +10,10 @@
 [node name="TelcOS" type="Node"]
 script = ExtResource("1_l5ht7")
 
-[node name="Filesystem" type="Node" parent="."]
+[node name="FileSystem" type="Node" parent="."]
 script = ExtResource("2_k64pf")
 
-[node name="iNode" type="Node" parent="Filesystem"]
+[node name="root" type="Node" parent="FileSystem"]
 script = ExtResource("2_s45tl")
 
 [node name="Session" type="Node" parent="."]
