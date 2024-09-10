@@ -1,5 +1,7 @@
 extends Node
 
+@export var telcos_scene: PackedScene
+
 var signal_bus
 
 # Called when the node enters the scene tree for the first time.
@@ -15,7 +17,7 @@ func _ready() -> void:
 		while file_name != "":
 			if !dir.current_is_dir() and file_name.ends_with(".xml"):
 				print("loading telco: " + file_name)
-				var new_telco = TelcOS.new()
+				var new_telco = telcos_scene.instantiate()
 				var telco_name = file_name.replace(".xml", "")
 				print("telco name: " + telco_name)
 				new_telco.name = telco_name

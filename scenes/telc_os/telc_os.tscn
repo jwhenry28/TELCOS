@@ -1,0 +1,26 @@
+[gd_scene load_steps=7 format=3 uid="uid://cpk2rb7eul543"]
+
+[ext_resource type="Script" path="res://scenes/telc_os/telc_os.gd" id="1_l5ht7"]
+[ext_resource type="Script" path="res://scenes/telc_os/filesystem.gd" id="2_k64pf"]
+[ext_resource type="Script" path="res://scenes/telc_os/i_node.gd" id="2_s45tl"]
+[ext_resource type="Script" path="res://scenes/telc_os/session.gd" id="3_72ytq"]
+[ext_resource type="Script" path="res://scenes/telc_os/user.gd" id="4_al4wo"]
+[ext_resource type="Script" path="res://scenes/telc_os/shell.gd" id="5_nl3g5"]
+
+[node name="TelcOS" type="Node"]
+script = ExtResource("1_l5ht7")
+
+[node name="Filesystem" type="Node" parent="."]
+script = ExtResource("2_k64pf")
+
+[node name="iNode" type="Node" parent="Filesystem"]
+script = ExtResource("2_s45tl")
+
+[node name="Session" type="Node" parent="."]
+script = ExtResource("3_72ytq")
+
+[node name="User" type="Node" parent="Session"]
+script = ExtResource("4_al4wo")
+
+[node name="Shell" type="Node" parent="."]
+script = ExtResource("5_nl3g5")

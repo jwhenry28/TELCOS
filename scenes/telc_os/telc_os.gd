@@ -17,199 +17,9 @@ class Cmd:
 		self.callback = new_callback
 
 
-class iNode:
-	var name: String
-	var type: String
-	var permissions: Dictionary
-	var content: String
-	var children: Array[iNode]
-	var properties: Dictionary
-
-
-	func _init(new_name:String, new_type:String, new_permissions:Dictionary = {}, new_properties:Dictionary = {}):
-		self.name = new_name
-		self.type = new_type
-
-		if new_permissions.is_empty():
-			new_permissions = {'*': 'rwx'}
-
-		self.permissions = new_permissions
-		self.children = []
-		self.properties = new_properties
-
-
-	func add_child(new_child:iNode) -> void:
-		# TODO: use return type instead if this becomes irritating
-		assert(type == 'dir', "Only directories can have children") 
-		self.children.append(new_child)
-
-
-	func get_child(child_name:String):
-		for child in self.children:
-			print("checking child: ", child.name)
-			if child.name == child_name:
-				return child
-		return null
-
-
-	func get_content() -> String:
-		if type == 'file':
-			return self.content
-		
-		return ""
-
-
-	func get_executable() -> String:
-		if type == 'executable':
-			return self.content
-
-		return ""
-
-
-	func set_content(new_content:String) -> void:
-		# TODO: use return type instead if this becomes irritating
-		assert(type == 'file' or type == 'executable', "Only files can have content")
-
-		# hack - this will prevent me from having tabs in the file contents.
-		# I'll figure out how to strip leading tabs from the XML file if this 
-		# becomes a problem.
-		new_content = new_content.replace("\t", "")
-		self.content = new_content
-
-
-	func get_user_permissions(username:String):
-		if permissions.has("*"):
-			return permissions["*"]
-		elif permissions.has(username):
-			return permissions[username]
-
-		return "---"
-
-
-	func verify_permissions(username:String, permission:String):
-		assert(permission == "r" or permission == "w" or permission == "x", "Invalid permission: " + permission)
-		
-		print("verifying permission '" + permission + "' for " + username + " on " + self.name)
-
-		var user_permissions = get_user_permissions(username)
-		var permission_bit = ""
-		match permission:
-			"r":
-				permission_bit = user_permissions[0]
-			"w":
-				permission_bit = user_permissions[1]
-			"x":
-				permission_bit = user_permissions[2]
-
-		return permission_bit == permission
-
-
-	func print_inode(recursive:bool = false, spacing:String = "") -> void:
-		print(spacing + "/" + self.name + " (" + self.type + ")")
-		for child in self.children:
-			child.print_inode(recursive, spacing + "    ")
-
-
-	func print_inode_details(recursive:bool = false) -> void:
-		print(self._to_string())
-		if recursive:
-			for child in self.children:
-				child.print_inode_details(recursive)
-
-
-	func _to_string() -> String:
-		var inode_string = self.name + " (" + self.type + ")\n"
-		inode_string += "permissions:\n"
-		for permission in self.permissions:
-			inode_string += " - " + permission + ": " + self.permissions[permission] + "\n"
-
-		inode_string += "properties: "
-		for property in self.properties:
-			inode_string += property + "=" + str(self.properties[property]) + ";"
-		inode_string += "\n"
-
-		inode_string += "content: " + self.content + "\n"
-		
-		inode_string += "children:\n"
-		for child in self.children:
-			inode_string += " - " + child.name + " (" + child.type + ")" + "\n"
-
-		return inode_string
-
-
-class Session:
-	var cwd: String
-	var username: String
-	var user: User
-
-	func _init():
-		self.cwd = ""
-		self.user = null
-
-	func get_username() -> String:
-		if user == null:
-			return ""
-		return user.username
-
-	func password() -> String:
-		if user == null:
-			return ""
-		return user.password
-
-	func home() -> String:
-		if user == null:
-			return ""
-		return user.home
-
-	func path() -> String:
-		if user == null:
-			return ""
-		return user.path
-
-
-class Shell:
-	var builtin_commands: Array[String]
-	var guest_commands: Array[String]
-
-	func _init(builtins: Array[String] = [], guest: Array[String] = []):
-		self.builtin_commands = builtins
-		self.guest_commands = guest
-
-
-	func assign_builtin_cmds(builtins: Array[String]):
-		for cmd in builtins:
-			if cmd != "":
-				self.builtin_commands.append(cmd)
-
-
-	func assign_guest_cmds(guest: Array[String]):
-		for cmd in guest:
-			if cmd != "":
-				self.guest_commands.append(cmd)
-
-
-class User:
-	var username: String
-	var password: String
-	var home: String
-	var path: String
-
-	func _init(new_username:String, new_password:String, new_home:String, new_path:String = ""):
-		assert (new_username != "" and new_password != "", "New users require a username and password")
-
-		self.username = new_username
-		self.password = new_password
-		self.home = new_home
-		self.path = new_path
-
-
-	func _to_string() -> String:
-		return username + ":" + password + " " + home + " " + path
-
-
 var telco_name: String
 var users: Array[User]
-var filesys: iNode
+var filesys: FileSystem
 var session: Session
 var shell: Shell
 var signal_bus: Node
@@ -333,7 +143,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 							var parent_inode:iNode = get_inode_from_path(parent_path)
 							assert(parent_inode != null, "Parent inode not found")
 
-							print("parent_inode: ", parent_inode.name)
+							print("parent_inode: ", parent_inode.filename)
 							file_permissions = parent_inode.permissions.duplicate()
 						else:
 							print("setting permissions")
@@ -362,7 +172,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 							print("parsing: ", property)
 							file_properties[property_name] = property_value
 
-						var new_inode = iNode.new(file_name, file_type, file_permissions, file_properties)
+						var new_inode = iNode.new(file_path, file_name, file_type, file_permissions, file_properties)
 						print("adding inode: " + file_name)
 						var res = add_to_filesystem(file_path, new_inode)
 						assert (res, "Failed to add inode to filesystem")
@@ -373,7 +183,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 				var content = parser.get_node_data().strip_edges(true, true)
 				if content != '':
 					print("NODE_TEXT")
-					print(current_inode.name, ': ', content)
+					print(current_inode.filename, ': ', content)
 					current_inode.set_content(content)
 			XMLParser.NODE_ELEMENT_END:
 				print("NODE_ELEMENT_END")
@@ -400,12 +210,12 @@ func add_to_filesystem(file_path:String, inode:iNode) -> bool:
 	for dir in file_path_array:
 		print("looking for: ", dir)
 		var child_name = dir
-		current_node = current_node.get_child(child_name)
+		current_node = current_node.get_child_inode(child_name)
 		
 		if current_node == null:
 			return false
 	
-	current_node.add_child(inode)
+	current_node.add_child_inode(inode)
 	return true
 
 
@@ -446,6 +256,7 @@ func path_to_absolute(file_path:String):
 	return "/".join(absolute_path_parts)
 
 
+# TODO: explore using node structure to retrieve children instead of nested arrays
 func get_inode_from_path(file_path:String):
 	print("get_inode_from_path: ", file_path)
 	assert(filesys != null, "Filesystem not loaded")
@@ -460,7 +271,7 @@ func get_inode_from_path(file_path:String):
 	var current_node = filesys
 	for dir in file_path_array.slice(1):
 		print("looking for: ", dir)
-		current_node = current_node.get_child(dir)
+		current_node = current_node.get_child_inode(dir)
 		
 		if current_node == null:
 			return null
@@ -491,14 +302,14 @@ func run_cmd(cmd_string: String) -> void:
 
 	var executables = get_user_executables(session.get_username())
 	for exe in executables:
-		if exe.name == cmd:
+		if exe.filename == cmd:
 			cmd = exe.get_executable()
 			BINARIES[cmd].callback.call(cmd, argv)
 			return
 
 	var absolute_path = path_to_absolute(cmd)
 	var executable_inode = get_inode_from_path(absolute_path)
-	if executable_inode != null:
+	if executable_inode != null and BINARIES.has(executable_inode.filename):
 		cmd = executable_inode.get_executable()
 		BINARIES[cmd].callback.call(cmd, argv)
 		return
@@ -531,9 +342,13 @@ func get_user_executables(username: String) -> Array[iNode]:
 		if dir_inode == null or !dir_inode.verify_permissions(username, "r"):
 			continue
 		for child in dir_inode.children:
-			print("child: ", child.name)
+			print("child: ", child.filename)
 			if child.type == "executable" and child.verify_permissions(username, "x"):
 				executables.append(child)
+
+	print("executables: ")
+	for exe in executables:
+		print(" - ", exe.filename)
 
 	return executables
 
@@ -602,8 +417,9 @@ func help_cmd(_cmd: String, _argv: Array):
 	
 	for exe in executables:
 		var executable_key = exe.get_executable()
+		print("checking: ", executable_key)
 		assert (executable_key != "", "Executable key not found")
-		msg += exe.name.to_upper() + ": " + BINARIES[executable_key].help + "\n"
+		msg += exe.filename.to_upper() + ": " + BINARIES[executable_key].help + "\n"
 	
 
 	stdout(msg)
@@ -668,15 +484,15 @@ func ls_cmd(_cmd: String, argv: Array):
 		for child in target_inode.children:
 			if verbose:
 				var user_permissions = child.get_user_permissions(session.get_username())
-				stdout("-" + user_permissions + " " + child.name)
+				stdout("-" + user_permissions + " " + child.filename)
 			else:
-				stdout(child.name)
+				stdout(child.filename)
 	else:
 		if verbose:
 			var user_permissions = target_inode.get_user_permissions(session.get_username())
-			stdout("-" + user_permissions + " " + target_inode.name)
+			stdout("-" + user_permissions + " " + target_inode.filename)
 		else:
-			stdout(target_inode.name)
+			stdout(target_inode.filename)
 
 
 func cd_cmd(_cmd: String, argv: Array):

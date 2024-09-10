@@ -7,7 +7,9 @@
 	<filesys>
 		<inode name="" type="dir">
 			<inode name="bin" type="dir" permissions="dialer:r-x">
-				<inode name="dial" type="executable"></inode>
+				<inode name="dial" type="executable">
+					dial_standard
+				</inode>
 			</inode>
 			<inode name="home" type="dir">
 				<inode name="telco2" type="dir" permissions="telco2:rw-">
