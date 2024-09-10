@@ -1,6 +1,5 @@
 extends Node
 
-var current_telco_name: String
 var signal_bus
 
 # Called when the node enters the scene tree for the first time.
@@ -9,9 +8,6 @@ func _ready() -> void:
 	assert(dir != null, "Failed to open telcos directory")
 
 	signal_bus = $"../SignalBus"
-	signal_bus.change_telco.connect(_on_change_telco)
-
-	current_telco_name = "telco1"
 
 	if dir:
 		dir.list_dir_begin()
@@ -29,24 +25,16 @@ func _ready() -> void:
 			file_name = dir.get_next()
 
 
-func get_telco(telco_name: String) -> TelcOS:
+func get_telco(telco_name: String):
 	for telco in self.get_children():
 		if telco.name == telco_name:
 			return telco
 	return null
 
 
-func run_cmd(cmd: String) -> CmdIO:
-	var telcOS = get_telco(current_telco_name)
-	return telcOS.run_cmd(cmd)
-
-
-func _on_change_telco(new_telco_name: String, username: String) -> void:
-	print("main: changing telco to ", username, "@", new_telco_name)
-	current_telco_name = new_telco_name
-
-	var telcOS = get_telco(current_telco_name)
-	telcOS.initialize_session(username)
+func run_cmd(telco_name: String, cmd: String) -> void:
+	var telcOS = get_telco(telco_name)
+	telcOS.run_cmd(cmd)
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.

@@ -4,7 +4,7 @@
 [ext_resource type="FontFile" uid="uid://bgadrxg0ccdgb" path="res://fonts/SFMonoRegular.otf" id="1_wqm58"]
 [ext_resource type="PackedScene" uid="uid://dcu2kfgje6oqm" path="res://scenes/terminal/terminal.tscn" id="2_vjuq6"]
 [ext_resource type="Script" path="res://scenes/terminal/terminal.gd" id="3_2qah6"]
-[ext_resource type="PackedScene" uid="uid://bujr143jleqbn" path="res://telco_network.tscn" id="6_klq8m"]
+[ext_resource type="PackedScene" uid="uid://bujr143jleqbn" path="res://scenes/telco_network/telco_network.tscn" id="6_klq8m"]
 [ext_resource type="Script" path="res://scenes/main/signal_bus.gd" id="7_7iogf"]
 
 [node name="Main" type="Node"]

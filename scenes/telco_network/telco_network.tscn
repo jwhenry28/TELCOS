@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://bujr143jleqbn"]
+
+[ext_resource type="Script" path="res://scenes/telco_network/telco_network.gd" id="1_jj3a5"]
+[ext_resource type="Script" path="res://scenes/telco_network/telcOS/telc_os.gd" id="2_rnb23"]
+
+[node name="TelcoNetwork" type="Node"]
+script = ExtResource("1_jj3a5")
+
+[node name="TelcOS" type="Node" parent="."]
+script = ExtResource("2_rnb23")

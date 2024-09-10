@@ -6,6 +6,207 @@ enum TelcoState {
 	DISCONNECTED
 }
 
+class Cmd:
+	var name: String
+	var help: String
+	var callback: Callable
+
+	func _init(new_name: String, new_help: String, new_callback: Callable):
+		self.name = new_name
+		self.help = new_help
+		self.callback = new_callback
+
+
+class iNode:
+	var name: String
+	var type: String
+	var permissions: Dictionary
+	var content: String
+	var children: Array[iNode]
+	var properties: Dictionary
+
+
+	func _init(new_name:String, new_type:String, new_permissions:Dictionary = {}, new_properties:Dictionary = {}):
+		self.name = new_name
+		self.type = new_type
+
+		if new_permissions.is_empty():
+			new_permissions = {'*': 'rwx'}
+
+		self.permissions = new_permissions
+		self.children = []
+		self.properties = new_properties
+
+
+	func add_child(new_child:iNode) -> void:
+		# TODO: use return type instead if this becomes irritating
+		assert(type == 'dir', "Only directories can have children") 
+		self.children.append(new_child)
+
+
+	func get_child(child_name:String):
+		for child in self.children:
+			print("checking child: ", child.name)
+			if child.name == child_name:
+				return child
+		return null
+
+
+	func get_content() -> String:
+		if type == 'file':
+			return self.content
+		
+		return ""
+
+
+	func get_executable() -> String:
+		if type == 'executable':
+			return self.content
+
+		return ""
+
+
+	func set_content(new_content:String) -> void:
+		# TODO: use return type instead if this becomes irritating
+		assert(type == 'file' or type == 'executable', "Only files can have content")
+
+		# hack - this will prevent me from having tabs in the file contents.
+		# I'll figure out how to strip leading tabs from the XML file if this 
+		# becomes a problem.
+		new_content = new_content.replace("\t", "")
+		self.content = new_content
+
+
+	func get_user_permissions(username:String):
+		if permissions.has("*"):
+			return permissions["*"]
+		elif permissions.has(username):
+			return permissions[username]
+
+		return "---"
+
+
+	func verify_permissions(username:String, permission:String):
+		assert(permission == "r" or permission == "w" or permission == "x", "Invalid permission: " + permission)
+		
+		print("verifying permission '" + permission + "' for " + username + " on " + self.name)
+
+		var user_permissions = get_user_permissions(username)
+		var permission_bit = ""
+		match permission:
+			"r":
+				permission_bit = user_permissions[0]
+			"w":
+				permission_bit = user_permissions[1]
+			"x":
+				permission_bit = user_permissions[2]
+
+		return permission_bit == permission
+
+
+	func print_inode(recursive:bool = false, spacing:String = "") -> void:
+		print(spacing + "/" + self.name + " (" + self.type + ")")
+		for child in self.children:
+			child.print_inode(recursive, spacing + "    ")
+
+
+	func print_inode_details(recursive:bool = false) -> void:
+		print(self._to_string())
+		if recursive:
+			for child in self.children:
+				child.print_inode_details(recursive)
+
+
+	func _to_string() -> String:
+		var inode_string = self.name + " (" + self.type + ")\n"
+		inode_string += "permissions:\n"
+		for permission in self.permissions:
+			inode_string += " - " + permission + ": " + self.permissions[permission] + "\n"
+
+		inode_string += "properties: "
+		for property in self.properties:
+			inode_string += property + "=" + str(self.properties[property]) + ";"
+		inode_string += "\n"
+
+		inode_string += "content: " + self.content + "\n"
+		
+		inode_string += "children:\n"
+		for child in self.children:
+			inode_string += " - " + child.name + " (" + child.type + ")" + "\n"
+
+		return inode_string
+
+
+class Session:
+	var cwd: String
+	var username: String
+	var user: User
+
+	func _init():
+		self.cwd = ""
+		self.user = null
+
+	func get_username() -> String:
+		if user == null:
+			return ""
+		return user.username
+
+	func password() -> String:
+		if user == null:
+			return ""
+		return user.password
+
+	func home() -> String:
+		if user == null:
+			return ""
+		return user.home
+
+	func path() -> String:
+		if user == null:
+			return ""
+		return user.path
+
+
+class Shell:
+	var builtin_commands: Array[String]
+	var guest_commands: Array[String]
+
+	func _init(builtins: Array[String] = [], guest: Array[String] = []):
+		self.builtin_commands = builtins
+		self.guest_commands = guest
+
+
+	func assign_builtin_cmds(builtins: Array[String]):
+		for cmd in builtins:
+			if cmd != "":
+				self.builtin_commands.append(cmd)
+
+
+	func assign_guest_cmds(guest: Array[String]):
+		for cmd in guest:
+			if cmd != "":
+				self.guest_commands.append(cmd)
+
+
+class User:
+	var username: String
+	var password: String
+	var home: String
+	var path: String
+
+	func _init(new_username:String, new_password:String, new_home:String, new_path:String = ""):
+		assert (new_username != "" and new_password != "", "New users require a username and password")
+
+		self.username = new_username
+		self.password = new_password
+		self.home = new_home
+		self.path = new_path
+
+
+	func _to_string() -> String:
+		return username + ":" + password + " " + home + " " + path
+
+
 var telco_name: String
 var users: Array[User]
 var filesys: iNode
@@ -13,6 +214,7 @@ var session: Session
 var shell: Shell
 var signal_bus: Node
 var telco_state: TelcoState
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	print("telcOS: loading")
@@ -60,7 +262,7 @@ func initialize_session(username: String, cwd: String = "") -> void:
 	assert(user_present, "User: " + username + " not found in " + telco_name)
 	
 	session.user = get_user_from_username(username)
-	session.username = username
+
 	if cwd == "":
 		session.cwd = session.user.home
 	else:
@@ -273,7 +475,7 @@ func get_user_from_username(username: String) -> User:
 	return null
 
 
-func run_cmd(cmd_string: String) -> CmdIO:
+func run_cmd(cmd_string: String) -> void:
 	print("running command: ", cmd_string)
 	var cmd_args = cmd_string.split(' ')
 	print("cmd_args: ", cmd_args)
@@ -282,31 +484,26 @@ func run_cmd(cmd_string: String) -> CmdIO:
 	var argv = cmd_args.slice(1)
 	print("argv: ", argv)
 
-	var io = CmdIO.new()
-
-	var user_commands = get_user_commands(session.username)
+	var user_commands = get_user_commands(session.get_username())
 	if user_commands.has(cmd):
-		BINARIES[cmd].callback.call(cmd, argv, io)
-		return io
+		BINARIES[cmd].callback.call(cmd, argv)
+		return
 
-	var executables = get_user_executables(session.username)
+	var executables = get_user_executables(session.get_username())
 	for exe in executables:
 		if exe.name == cmd:
 			cmd = exe.get_executable()
-			BINARIES[cmd].callback.call(cmd, argv, io)
-			return io
+			BINARIES[cmd].callback.call(cmd, argv)
+			return
 
 	var absolute_path = path_to_absolute(cmd)
 	var executable_inode = get_inode_from_path(absolute_path)
 	if executable_inode != null:
 		cmd = executable_inode.get_executable()
-		BINARIES[cmd].callback.call(cmd, argv, io)
-		return io
+		BINARIES[cmd].callback.call(cmd, argv)
+		return
 
-	io.set_return_code(1)
-	print_stdout(cmd + ": command not found")
-
-	return io
+	stdout(cmd + ": command not found")
 
 
 func authenticate_user(username: String, password: String) -> bool:
@@ -315,7 +512,7 @@ func authenticate_user(username: String, password: String) -> bool:
 		return false
 	
 	if user.password == password:
-		session.username = username
+		initialize_session(username)
 		return true
 	return false
 
@@ -351,7 +548,7 @@ func get_user_commands(username: String) -> Array[String]:
 	return commands
 
 
-func print_stdout(msg: String) -> void:
+func stdout(msg: String) -> void:
 	signal_bus.telco_stdout.emit(msg)
 
 
@@ -395,10 +592,10 @@ var BINARIES: Dictionary = {
 }
 
 
-func help_cmd(_cmd: String, _argv: Array, io: CmdIO):
+func help_cmd(_cmd: String, _argv: Array):
 	var msg = ""
-	var commands = get_user_commands(session.username)
-	var executables = get_user_executables(session.username)
+	var commands = get_user_commands(session.get_username())
+	var executables = get_user_executables(session.get_username())
 
 	for cmd in commands:
 		msg += BINARIES[cmd].name.to_upper() + ": " + BINARIES[cmd].help + "\n"
@@ -409,30 +606,30 @@ func help_cmd(_cmd: String, _argv: Array, io: CmdIO):
 		msg += exe.name.to_upper() + ": " + BINARIES[executable_key].help + "\n"
 	
 
-	print_stdout(msg)
+	stdout(msg)
 
 
-func whoami_cmd(_cmd: String, _argv: Array, io: CmdIO):
+func whoami_cmd(_cmd: String, _argv: Array):
 	var msg = ""
-	if session.username == "":
+	if session.get_username() == "":
 		msg = "guest@" + telco_name + " (unauthenticated)"
 	else:
-		msg = session.username + "@" + telco_name
-	print_stdout(msg)
+		msg = session.get_username() + "@" + telco_name
+	stdout(msg)
 
 
-func users_cmd(_cmd: String, _argv: Array, io: CmdIO):
+func users_cmd(_cmd: String, _argv: Array):
 	var msg = ""
 	for user in users:
 		msg += user.username + "\n"
-	print_stdout(msg)
+	stdout(msg)
 
 
-func pwd_cmd(_cmd: String, _argv: Array, io: CmdIO):
-	print_stdout(session.cwd)
+func pwd_cmd(_cmd: String, _argv: Array):
+	stdout(session.cwd)
 
 
-func ls_cmd(_cmd: String, argv: Array, io: CmdIO):
+func ls_cmd(_cmd: String, argv: Array):
 	var path = ""
 	var verbose = false
 
@@ -458,36 +655,36 @@ func ls_cmd(_cmd: String, argv: Array, io: CmdIO):
 
 	var target_inode = get_inode_from_path(absolute_path)
 	if target_inode == null:
-		io.set_return_code(1)
-		print_stdout("no such file or directory: " + path)
+		
+		stdout("no such file or directory: " + path)
 		return
 
-	if !target_inode.verify_permissions(session.username, "r"):
-		io.set_return_code(1)
-		print_stdout("permission denied: " + path)
+	if !target_inode.verify_permissions(session.get_username(), "r"):
+		
+		stdout("permission denied: " + path)
 		return
 
 	if target_inode.type == "dir":
 		for child in target_inode.children:
 			if verbose:
-				var user_permissions = child.get_user_permissions(session.username)
-				print_stdout("-" + user_permissions + " " + child.name)
+				var user_permissions = child.get_user_permissions(session.get_username())
+				stdout("-" + user_permissions + " " + child.name)
 			else:
-				print_stdout(child.name)
+				stdout(child.name)
 	else:
 		if verbose:
-			var user_permissions = target_inode.get_user_permissions(session.username)
-			print_stdout("-" + user_permissions + " " + target_inode.name)
+			var user_permissions = target_inode.get_user_permissions(session.get_username())
+			stdout("-" + user_permissions + " " + target_inode.name)
 		else:
-			print_stdout(target_inode.name)
+			stdout(target_inode.name)
 
 
-func cd_cmd(_cmd: String, argv: Array, io: CmdIO):
+func cd_cmd(_cmd: String, argv: Array):
 	var path = ""
 	if argv.size() == 0:
 		if session.user == null or session.user.home == "":
-			io.set_return_code(1)
-			print_stdout("no home dir set")
+			
+			stdout("no home dir set")
 			return
 		path = session.user.home
 	elif argv.size() == 1:
@@ -498,26 +695,26 @@ func cd_cmd(_cmd: String, argv: Array, io: CmdIO):
 
 	var target_inode = get_inode_from_path(absolute_path)
 	if target_inode == null:
-		io.set_return_code(1)
-		print_stdout("no such file or directory")
+		
+		stdout("no such file or directory")
 		return
 
-	if !target_inode.verify_permissions(session.username, "r"):
-		io.set_return_code(1)
-		print_stdout("permission denied")
+	if !target_inode.verify_permissions(session.get_username(), "r"):
+		
+		stdout("permission denied")
 		return
 
 	if target_inode.type == "dir":
 		session.cwd = absolute_path
 	else:
-		io.set_return_code(1)
-		print_stdout("not a directory")
+		
+		stdout("not a directory")
 
 
-func cat_cmd(cmd: String, argv: Array, io: CmdIO):
+func cat_cmd(cmd: String, argv: Array):
 	if argv.size() != 1:
-		io.set_return_code(1)
-		print_stdout("usage: " + cmd + " <path>")
+		
+		stdout("usage: " + cmd + " <path>")
 		return
 	
 	var path = argv[0]
@@ -526,26 +723,26 @@ func cat_cmd(cmd: String, argv: Array, io: CmdIO):
 
 	var target_inode = get_inode_from_path(absolute_path)
 	if target_inode == null:
-		io.set_return_code(1)
-		print_stdout("no such file or directory")
+		
+		stdout("no such file or directory")
 		return
 	
-	if !target_inode.verify_permissions(session.username, "r"):
-		io.set_return_code(1)
-		print_stdout("permission denied")
+	if !target_inode.verify_permissions(session.get_username(), "r"):
+		
+		stdout("permission denied")
 		return
 
 	if target_inode.type == "file":
-		print_stdout(target_inode.get_content())
+		stdout(target_inode.get_content())
 	else:
-		io.set_return_code(1)
-		print_stdout("not a file")
+		
+		stdout("not a file")
 
 
-func auth_cmd(cmd: String, argv: Array, io: CmdIO):
+func auth_cmd(cmd: String, argv: Array):
 	if argv.size() < 1 or argv[0].find(":") == -1:
-		io.set_return_code(1)
-		print_stdout("usage: " + cmd + " <username>:<password>")
+		
+		stdout("usage: " + cmd + " <username>:<password>")
 		return
 	
 	var auth_string = argv[0]
@@ -553,27 +750,25 @@ func auth_cmd(cmd: String, argv: Array, io: CmdIO):
 	var password = auth_string.split(':')[1]
 
 	if !authenticate_user(username, password):
-		io.set_return_code(1)
-		print_stdout("invalid credentials")
+		
+		stdout("invalid credentials")
 		return
 	
-	print_stdout("welcome, " + session.username + "!")
-	session.username = username
-	session.user = get_user_from_username(username)
-	session.cwd = session.user.home
+	initialize_session(username)
+	stdout("welcome, " + session.get_username()+ "!")
 
 
-func dial_executable(_cmd: String, argv: Array, io: CmdIO):
+func dial_executable(_cmd: String, argv: Array):
 	print("dial start")
 	if argv.size() != 1:
-		io.set_return_code(1)
-		print_stdout("no telco name provided")
+		
+		stdout("no telco name provided")
 		return
 	
 	var auth_string = argv[0]
 
 	if auth_string.find(":") == -1 or auth_string.find("@") == -1:
-		auth_string = session.username + ":" + session.user.password + "@" + argv[0]
+		auth_string = session.get_username()+ ":" + session.user.password + "@" + argv[0]
 	
 	print(auth_string)
 	var dst_telco = auth_string.split("@")[1]
@@ -583,4 +778,4 @@ func dial_executable(_cmd: String, argv: Array, io: CmdIO):
 
 	send_network_data(telco_name, dst_telco, data)
 	telco_state = TelcoState.CONNECTING
-	print_stdout("dialing...")
+	stdout("dialing...")
