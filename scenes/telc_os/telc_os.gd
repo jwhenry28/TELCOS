@@ -3,9 +3,10 @@ class_name TelcOS extends Node
 
 enum TelcoState {
 	RUNNING,
-	CONNECTING,
+	DIALING,
 	DISCONNECTED
 }
+
 
 class Cmd:
 	var name: String
@@ -19,12 +20,13 @@ class Cmd:
 
 
 var telco_name: String
-var users: Array[User]
+var users: UsersDirectory
 var filesys: FileSystem
 var session: Session
 var shell: Shell
 var signal_bus: Node
 var telco_state: TelcoState
+
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -37,7 +39,7 @@ func _ready() -> void:
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(_delta: float) -> void:
 	match telco_state:
-		TelcoState.CONNECTING:
+		TelcoState.DIALING:
 			pass
 		TelcoState.RUNNING:
 			pass
@@ -49,6 +51,7 @@ func initialize_telco(new_telco_name: String) -> void:
 	telco_name = new_telco_name
 	session = Session.new()
 	shell = Shell.new()
+	users = UsersDirectory.new()
 	signal_bus = get_node("../../SignalBus")
 	signal_bus.network_data.connect(receive_network_data)
 	telco_state = TelcoState.RUNNING
@@ -67,7 +70,7 @@ func initialize_telco(new_telco_name: String) -> void:
 
 func initialize_session(username: String, cwd: String = "") -> void:
 	var user_present = false
-	for user in users:
+	for user in users.get_users():
 		if user.username == username:
 			user_present = true
 			break
@@ -107,14 +110,11 @@ func load_telco_xml(new_telco_name: String) -> void:
 						pass
 					'user':
 						print("adding user: ", attributes_dict.get('name', ''))
-						var new_user:User = User.new()
-						new_user.initialize(
-							attributes_dict.get('name', ''), 
-							attributes_dict.get('password', ''), 
-							attributes_dict.get('home', ''), 
-							attributes_dict.get('path', '')
-						)
-						users.append(new_user)
+						var username = attributes_dict.get('name', '')
+						var password = attributes_dict.get('password', '')
+						var home = attributes_dict.get('home', '')
+						var path = attributes_dict.get('path', '')
+						users.register_user(username, password, home, path)
 					'shell':
 						print(shell == null)
 						var builtins = attributes_dict.get('builtins', '').split(';')
@@ -195,6 +195,10 @@ func load_telco_xml(new_telco_name: String) -> void:
 				if content != '':
 					print("NODE_TEXT")
 					print(current_inode.filename, ': ', content)
+
+					if current_inode.type == "executable":
+						assert(BINARIES.has(content) or SERVICES.has(content), "(" + telco_name + ") o implementation for executable: " + content)
+
 					current_inode.set_content(content)
 			XMLParser.NODE_ELEMENT_END:
 				print("NODE_ELEMENT_END")
@@ -279,10 +283,7 @@ func get_inode_from_path(file_path:String):
 
 
 func get_user_from_username(username: String) -> User:
-	for user in users:
-		if user.username == username:
-			return user
-	return null
+	return users.get_user(username)
 
 
 func authenticate_user(username: String, password: String) -> bool:
@@ -344,10 +345,10 @@ func receive_network_data(source: String, destination: String, data: String) -> 
 	if destination != telco_name:
 		return	
 
-	run_cmd(data, true)
+	run_service_cmd(data, source)
 
 
-func run_cmd(cmd_string: String, is_network_cmd: bool = false) -> void:
+func run_cmd(cmd_string: String) -> void:
 	print("running command: ", cmd_string)
 	var cmd_args = cmd_string.split(' ')
 	print("cmd_args: ", cmd_args)
@@ -356,13 +357,6 @@ func run_cmd(cmd_string: String, is_network_cmd: bool = false) -> void:
 	var argv = cmd_args.slice(1)
 	print("argv: ", argv)
 
-	# TODO: not a good long-term way to do this
-	if is_network_cmd:
-		if BINARIES.has(cmd):
-			BINARIES[cmd].callback.call(cmd, argv)
-			return
-		else:
-			return
 
 	var user_commands = get_user_commands(session.get_username())
 	print("checking builtins")
@@ -384,12 +378,28 @@ func run_cmd(cmd_string: String, is_network_cmd: bool = false) -> void:
 	var executable_inode = get_inode_from_path(absolute_path)
 	print("checking absolute filepath")
 	if executable_inode != null and BINARIES.has(executable_inode.get_executable()):
+		if !executable_inode.verify_permissions(session.get_username(), "x"):
+			stdout("permission denied")
+			return
+
 		print("running executable from absolute filepath")
 		cmd = executable_inode.get_executable()
 		BINARIES[cmd].callback.call(cmd, argv)
 		return
 
 	stdout(cmd + ": command not found")
+
+
+func run_service_cmd(cmd_string: String, source: String) -> void:
+	var cmd_args = cmd_string.split(' ')
+	var cmd = cmd_args[0]
+	var argv = cmd_args.slice(1)
+
+	if SERVICES.has(cmd):
+		SERVICES[cmd].callback.call(cmd, argv, source)
+		return
+	else:
+		return
 
 
 var BINARIES: Dictionary = {
@@ -402,9 +412,13 @@ var BINARIES: Dictionary = {
 	"cat": Cmd.new("cat", "Prints the content of a file", cat_cmd),
 	"auth": Cmd.new("auth", "Authenticates the user", auth_cmd),
 	"dial_standard": Cmd.new("dial", "Dial a new telco", dial_executable),
-	"dial_received": Cmd.new("dial_received", "Dial a new telco", dial_received),
+	"decryptor_standard": Cmd.new("decryptor", "Decrypts a file", decryptor_executable),
 }
 
+var SERVICES: Dictionary = {
+	"dial.service": Cmd.new("dial.service", "Handles incoming calls", dial_service),
+	"msg.service": Cmd.new("msg.service", "Catches inbound messages", msg_service),
+}
 
 func help_cmd(_cmd: String, _argv: Array):
 	var msg = ""
@@ -435,7 +449,7 @@ func whoami_cmd(_cmd: String, _argv: Array):
 
 func users_cmd(_cmd: String, _argv: Array):
 	var msg = ""
-	for user in users:
+	for user in users.get_users():
 		msg += user.username + "\n"
 	stdout(msg)
 
@@ -587,16 +601,50 @@ func dial_executable(_cmd: String, argv: Array):
 	
 	print(auth_string)
 	var dst_telco = auth_string.split("@")[1]
-	var data = "dial_received " + auth_string
+	var data = "dial.service " + auth_string
 
 	print("dialing telco: ", dst_telco)
 
 	stdout("dialing...")
 	send_network_data(telco_name, dst_telco, data)
-	telco_state = TelcoState.CONNECTING
+	telco_state = TelcoState.DIALING
 
 
-func dial_received(_cmd: String, argv: Array):
+func decryptor_executable(cmd: String, argv: Array):
+	if argv.size() != 1:
+		stdout("usage: " + cmd + " <path>")
+		return
+	
+	var path = argv[0]
+	var absolute_path = path_to_absolute(path)
+	var target_inode = get_inode_from_path(absolute_path)
+
+	if target_inode == null:
+		stdout("no such file or directory")
+		return
+	
+	if !target_inode.verify_permissions(session.get_username(), "r"):
+		stdout("permission denied")
+		return
+	
+	if target_inode.type != "file":
+		stdout("not a file")
+		return
+	
+	if !target_inode.properties.has("encrypted"):
+		stdout("file is not encrypted")
+		return
+	
+	target_inode.properties.erase("encrypted")
+	stdout("successfully decrypted " + target_inode.filename)
+
+
+func msg_service(_cmd: String, argv: Array, _source: String):
+	var msg = argv[0]
+	stdout(msg)
+
+
+func dial_service(_cmd: String, argv: Array, source: String):
 	var auth_string = argv[0]
 	var username = auth_string.split(":")[0]
 	var tmp = auth_string.split(":")[1]
@@ -604,8 +652,7 @@ func dial_received(_cmd: String, argv: Array):
 	var auth_telco_name = tmp.split("@")[1]
 
 	if authenticate_user(username, password):
-		print("authenticated user: ", username)
 		signal_bus.change_telco.emit(auth_telco_name, username)
 		signal_bus.telco_stdout.emit(auth_telco_name + ": welcome " + username + "!")
 	else:
-		print("failed to authenticate user: ", username)
+		send_network_data(source, telco_name, "msg.service " + "unauthorized")

@@ -45,6 +45,26 @@ func get_child_inode(child_name:String):
 
 func get_content() -> String:
 	if type == 'file':
+		if properties.has("encrypted"):
+			seed(self.content.hash())
+			randomize()
+
+			var encryption_block = "----- BEGIN PGP MESSAGE -----\nVersion: 2.6.2\n\n"
+			var encrypted_content = ""
+			var padding = 4
+			var line_size = 32
+			var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+			
+			for i in range(self.content.length() * 2):
+				encrypted_content += alphabet[randi() % alphabet.length()]
+			while encrypted_content.length() % padding != 0:
+				encrypted_content += "="
+			while encrypted_content.length() > 0:
+				encryption_block += encrypted_content.substr(0, line_size) + "\n"
+				encrypted_content = encrypted_content.substr(line_size)
+
+			encryption_block += "-----  END PGP MESSAGE  -----\n"
+			return encryption_block
 		return self.content
 	
 	return ""

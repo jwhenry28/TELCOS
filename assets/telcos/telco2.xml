@@ -20,7 +20,9 @@
 					<inode name="test.txt" type="file" properties="encrypted">
 						This was an encrypted message. You have now decrypted it.
 					</inode>
-					<inode name="decryptor" type="executable"></inode>
+					<inode name="decryptor" type="executable" permissions="telco2:r-x">
+						decryptor_standard
+					</inode>
 					<inode name=".trash" type="dir">
 						<inode name="report.txt" type="file" properties="encrypted">
 							FROM: telco2@telco2
@@ -56,9 +58,9 @@
 
 					We connect the world.
 
-					TELCO's innovation has driven technological change for the better part of the past century. From our laboratories came the first transnational communication system, the first hyper-transistor, dozens of new programming languages, and the finest mathmaticians in the world.
+					TELCO's innovation has driven technological change for the better part of the past century. From our laboratories came the first transnational communication system, the first hyper-transistor, multiple new programming languages, and the finest engineers in the world.
 
-					We are pleased to welcome you into our ranks, and look forward to seeing you contribute to the TELCO family.
+					We are pleased to welcome you into our ranks, and look forward to seeing you contribute to the TELCO future.
 
 					(end volume 1)
 				</inode>
@@ -66,14 +68,14 @@
 					----- BEGIN TRANSMISSION -----
 					ATTENTION TELCO PERSONNEL
 
-					Our proprietary decryptor has
+					Our proprietary decryptor recently
 					appeared on a public forum.
-					Until the source of the breach is
-					identified, we are enacting
+					Until the source of the breach 
+					is identified, we are enacting
 					increased security measures.
 
 					If you see any suspicious
-					behavior, please report it to
+					behavior, please report to
 					management immediately.
 
 					-----  END TRANSMISSION  -----
