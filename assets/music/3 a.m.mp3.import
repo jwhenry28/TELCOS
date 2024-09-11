@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://86a37s13trx3"
+path="res://.godot/imported/3 a.m.mp3-ba5b97a740f658676249c3990726a6fe.mp3str"
+
+[deps]
+
+source_file="res://assets/music/3 a.m.mp3"
+dest_files=["res://.godot/imported/3 a.m.mp3-ba5b97a740f658676249c3990726a6fe.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

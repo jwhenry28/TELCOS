@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://cw7sfloxa7pdc"
+path="res://.godot/imported/Tears In Rain.mp3-b2b70c1f22b88b6b13580cb5fa530411.mp3str"
+
+[deps]
+
+source_file="res://assets/music/Tears In Rain.mp3"
+dest_files=["res://.godot/imported/Tears In Rain.mp3-b2b70c1f22b88b6b13580cb5fa530411.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

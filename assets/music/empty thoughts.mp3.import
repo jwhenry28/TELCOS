@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://da07qc3q1a6bl"
+path="res://.godot/imported/empty thoughts.mp3-ddae79690e683f69b8c59334bca846e0.mp3str"
+
+[deps]
+
+source_file="res://assets/music/empty thoughts.mp3"
+dest_files=["res://.godot/imported/empty thoughts.mp3-ddae79690e683f69b8c59334bca846e0.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
