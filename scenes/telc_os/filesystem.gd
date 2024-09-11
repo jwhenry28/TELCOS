@@ -18,5 +18,4 @@ func initialize_filesystem(file_permissions:Dictionary, file_properties:Dictiona
 
 
 func get_root_node() -> iNode:
-	print("filesystem: getting root node")
 	return $"root"

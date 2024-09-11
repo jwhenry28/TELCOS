@@ -1,4 +1,10 @@
-[gd_scene load_steps=2 format=3 uid="uid://dcu2kfgje6oqm"]
+[gd_scene load_steps=7 format=3 uid="uid://dcu2kfgje6oqm"]
+
+[ext_resource type="Script" path="res://scenes/terminal/terminal.gd" id="1_w2tw2"]
+[ext_resource type="AudioStream" uid="uid://dkvmkfh4hh8hp" path="res://assets/sounds/backspace.wav" id="2_xrpqi"]
+[ext_resource type="AudioStream" uid="uid://digw3ohtair7r" path="res://assets/sounds/enter.wav" id="4_7r8uo"]
+[ext_resource type="AudioStream" uid="uid://5dxbn8v7fqnb" path="res://assets/sounds/dial.mp3" id="4_swunc"]
+[ext_resource type="AudioStream" uid="uid://brxpld4vm4y3g" path="res://assets/sounds/error2.wav" id="5_suyrr"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_i6ckf"]
 bg_color = Color(0, 0, 0, 0)
@@ -8,6 +14,7 @@ offset_left = 32.0
 offset_top = 32.0
 offset_right = 608.0
 offset_bottom = 550.0
+script = ExtResource("1_w2tw2")
 
 [node name="TerminalHistory" type="ScrollContainer" parent="."]
 layout_mode = 1
@@ -30,16 +37,6 @@ size_flags_horizontal = 3
 layout_mode = 2
 text = "WELCOME TO TELCO1. TYPE 'HELP' TO BEGIN:"
 
-[node name="whoami" type="Label" parent="TerminalHistory/VBoxContainer"]
-visible = false
-layout_mode = 2
-text = "> whoami"
-
-[node name="telco1" type="Label" parent="TerminalHistory/VBoxContainer"]
-visible = false
-layout_mode = 2
-text = "telco1@telco1"
-
 [node name="HBoxContainer" type="HBoxContainer" parent="TerminalHistory/VBoxContainer"]
 layout_mode = 2
 
@@ -59,3 +56,17 @@ theme_override_styles/focus = SubResource("StyleBoxFlat_i6ckf")
 placeholder_text = "..."
 wrap_mode = 1
 autowrap_mode = 1
+
+[node name="TerminalNoises" type="Node" parent="."]
+
+[node name="enter" type="AudioStreamPlayer" parent="TerminalNoises"]
+stream = ExtResource("4_7r8uo")
+
+[node name="backspace" type="AudioStreamPlayer" parent="TerminalNoises"]
+stream = ExtResource("2_xrpqi")
+
+[node name="dial" type="AudioStreamPlayer" parent="TerminalNoises"]
+stream = ExtResource("4_swunc")
+
+[node name="stderr" type="AudioStreamPlayer" parent="TerminalNoises"]
+stream = ExtResource("5_suyrr")

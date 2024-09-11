@@ -100,8 +100,6 @@ func get_user_permissions(username:String):
 func verify_permissions(username:String, permission:String):
 	assert(permission == "r" or permission == "w" or permission == "x", "Invalid permission: " + permission)
 	
-	print("verifying permission '" + permission + "' for " + username + " on " + self.filename)
-
 	var user_permissions = get_user_permissions(username)
 	var permission_bit = ""
 	match permission:

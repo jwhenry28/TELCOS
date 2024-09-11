@@ -1,9 +1,8 @@
-[gd_scene load_steps=7 format=3 uid="uid://dabc33oxpynev"]
+[gd_scene load_steps=6 format=3 uid="uid://dabc33oxpynev"]
 
 [ext_resource type="Script" path="res://scenes/main/main.gd" id="1_8xtc6"]
 [ext_resource type="FontFile" uid="uid://bgadrxg0ccdgb" path="res://fonts/SFMonoRegular.otf" id="1_wqm58"]
 [ext_resource type="PackedScene" uid="uid://dcu2kfgje6oqm" path="res://scenes/terminal/terminal.tscn" id="2_vjuq6"]
-[ext_resource type="Script" path="res://scenes/terminal/terminal.gd" id="3_2qah6"]
 [ext_resource type="PackedScene" uid="uid://bujr143jleqbn" path="res://scenes/telco_network/telco_network.tscn" id="6_klq8m"]
 [ext_resource type="Script" path="res://scenes/main/signal_bus.gd" id="7_7iogf"]
 
@@ -36,7 +35,6 @@ text = "TELCOS"
 horizontal_alignment = 1
 
 [node name="Terminal" parent="." instance=ExtResource("2_vjuq6")]
-script = ExtResource("3_2qah6")
 
 [node name="Comms" type="Panel" parent="."]
 offset_left = 640.0
