@@ -11,7 +11,7 @@ func _ready() -> void:
 	terminal = $"Terminal"
 	telco_network = $"TelcoNetwork"
 	signal_bus = $"SignalBus"
-	print("main: done")
+	print("main: done\n\n")
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.

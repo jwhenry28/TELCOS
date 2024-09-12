@@ -6,6 +6,7 @@ signal terminal_state(state: String)
 signal change_telco(new_telco_name: String, username: String)
 signal terminal_stdout(msg: String)
 signal terminal_stderr(msg: String)
+signal play_sound(sound_name: String)
 
 
 func _ready() -> void:

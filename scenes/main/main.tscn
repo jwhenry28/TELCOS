@@ -1,16 +1,40 @@
-[gd_scene load_steps=6 format=3 uid="uid://dabc33oxpynev"]
+[gd_scene load_steps=13 format=3 uid="uid://dabc33oxpynev"]
 
 [ext_resource type="Script" path="res://scenes/main/main.gd" id="1_8xtc6"]
 [ext_resource type="FontFile" uid="uid://bgadrxg0ccdgb" path="res://fonts/SFMonoRegular.otf" id="1_wqm58"]
 [ext_resource type="PackedScene" uid="uid://dcu2kfgje6oqm" path="res://scenes/terminal/terminal.tscn" id="2_vjuq6"]
+[ext_resource type="PackedScene" uid="uid://ubjm0fbrgccd" path="res://scenes/music_player/music_player.tscn" id="3_rtfeo"]
+[ext_resource type="Script" path="res://scenes/main/sound_player.gd" id="4_6sdjd"]
+[ext_resource type="AudioStream" uid="uid://digw3ohtair7r" path="res://assets/sounds/enter.wav" id="5_op1kq"]
+[ext_resource type="PackedScene" uid="uid://drpuhhwfh5rn2" path="res://scenes/comms/comms.tscn" id="6_77t78"]
 [ext_resource type="PackedScene" uid="uid://bujr143jleqbn" path="res://scenes/telco_network/telco_network.tscn" id="6_klq8m"]
+[ext_resource type="AudioStream" uid="uid://dkvmkfh4hh8hp" path="res://assets/sounds/backspace.wav" id="6_yqf0c"]
 [ext_resource type="Script" path="res://scenes/main/signal_bus.gd" id="7_7iogf"]
+[ext_resource type="AudioStream" uid="uid://5dxbn8v7fqnb" path="res://assets/sounds/dial.mp3" id="7_qlhlb"]
+[ext_resource type="AudioStream" uid="uid://brxpld4vm4y3g" path="res://assets/sounds/error2.wav" id="8_icns6"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_8xtc6")
 
 [node name="SignalBus" type="Node" parent="."]
 script = ExtResource("7_7iogf")
+
+[node name="MusicPlayer" parent="." instance=ExtResource("3_rtfeo")]
+
+[node name="SoundPlayer" type="Node" parent="."]
+script = ExtResource("4_6sdjd")
+
+[node name="enter" type="AudioStreamPlayer" parent="SoundPlayer"]
+stream = ExtResource("5_op1kq")
+
+[node name="backspace" type="AudioStreamPlayer" parent="SoundPlayer"]
+stream = ExtResource("6_yqf0c")
+
+[node name="dial" type="AudioStreamPlayer" parent="SoundPlayer"]
+stream = ExtResource("7_qlhlb")
+
+[node name="stderr" type="AudioStreamPlayer" parent="SoundPlayer"]
+stream = ExtResource("8_icns6")
 
 [node name="BlackBackground" type="ColorRect" parent="."]
 anchors_preset = 15
@@ -36,11 +60,7 @@ horizontal_alignment = 1
 
 [node name="Terminal" parent="." instance=ExtResource("2_vjuq6")]
 
-[node name="Comms" type="Panel" parent="."]
-offset_left = 640.0
-offset_top = 32.0
-offset_right = 1024.0
-offset_bottom = 275.0
+[node name="Comms" parent="." instance=ExtResource("6_77t78")]
 
 [node name="Stats" type="Panel" parent="."]
 offset_left = 640.0

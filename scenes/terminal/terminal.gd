@@ -5,9 +5,9 @@ enum TerminalState {
 	DIALING,
 }
 
-var TERMINAL_GREEN: Color = Color8(57, 255, 20, 255)
-var BG_TERMINAL_GREEN: Color = Color8(11, 50, 4, 255)
-var FONT_SIZE: int = 12
+const TERMINAL_GREEN: Color = Color8(57, 255, 20, 255)
+const BG_TERMINAL_GREEN: Color = Color8(11, 50, 4, 255)
+const FONT_SIZE: int = 12
 
 var last_sibling_index: int
 var old_max_scroll_height: float = 0.0
@@ -37,24 +37,6 @@ func _ready() -> void:
 	terminal_history_scrollbar = $"TerminalHistory".get_v_scroll_bar()
 	telco_network = $"../TelcoNetwork"
 	terminal_noises = $"TerminalNoises"
-
-	var dir = DirAccess.open("res://assets/sounds/typing")
-	assert(dir != null, "Failed to open telcos directory")
-
-	if dir:
-		dir.list_dir_begin()
-		var file_name = dir.get_next()
-		var type_count = 1
-		while file_name != "":
-			if !dir.current_is_dir() and file_name.ends_with(".wav"):
-				print("loading typing noise: ", file_name)
-				var new_typing_noise = AudioStreamPlayer.new()
-				new_typing_noise.name = "type" + str(type_count)
-				new_typing_noise.stream = load("res://assets/sounds/typing/" + file_name)
-				terminal_noises.add_child(new_typing_noise)
-				type_count += 1
-			file_name = dir.get_next()
-		num_typing_noises = type_count - 1
 
 	signal_bus = $"../SignalBus"
 	signal_bus.terminal_stdout.connect(add_to_history)
@@ -96,12 +78,11 @@ func _process(delta: float) -> void:
 func _input(event):
 	if event is InputEventKey and event.is_pressed() and !event.is_echo():
 		if event.keycode == KEY_ENTER:
-			terminal_noises.get_node("enter").play()
+			signal_bus.play_sound.emit("enter")
 		elif event.keycode == KEY_BACKSPACE:
-			terminal_noises.get_node("backspace").play()
+			signal_bus.play_sound.emit("backspace")
 		else:
-			var type_sound_name = "type" + str(randi() % num_typing_noises + 1)
-			terminal_noises.get_node(type_sound_name).play()
+			signal_bus.play_sound.emit("key")
 
 	if Input.is_action_just_released("cmd_enter"):
 		print("consuming textedit")
@@ -120,7 +101,7 @@ func consume_text() -> String:
 
 func adjust_scrollbar() -> void:
 	if terminal_history_scrollbar != null:
-		terminal_history_container.scroll_vertical = terminal_history_scrollbar.max_value
+		terminal_history_container.scroll_vertical = int(terminal_history_scrollbar.max_value)
 
 func add_to_history(text: String, is_stderr: bool = false) -> void:
 	print("adding to history: ", text)
@@ -169,4 +150,4 @@ func _on_terminal_state(state: String) -> void:
 			animation_timing = 0.0
 			animation_label = vbox_container.get_child(last_sibling_index)
 			cmd_prompt_textedit.release_focus()
-			terminal_noises.get_node("dial").play()
+			signal_bus.play_sound.emit("dial")

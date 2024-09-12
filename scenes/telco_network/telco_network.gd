@@ -26,7 +26,7 @@ func _ready() -> void:
 				print("telco added")
 			file_name = dir.get_next()
 	
-	get_telco("telco1").initialize_session("dialer")
+	# get_telco("telco1").initialize_session("dialer")
 
 
 func get_telco(telco_name: String):
