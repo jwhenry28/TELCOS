@@ -11,6 +11,8 @@ func _ready() -> void:
 	terminal = $"Terminal"
 	telco_network = $"TelcoNetwork"
 	signal_bus = $"SignalBus"
+
+	$"Comms".play_cutscene("tutorial")
 	print("main: done\n\n")
 
 
