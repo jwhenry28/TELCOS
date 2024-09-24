@@ -3,6 +3,7 @@ extends Panel
 enum TerminalState {
 	TYPING,
 	DIALING,
+	INACTIVE,
 }
 
 const TERMINAL_GREEN: Color = Color8(57, 255, 20, 255)
@@ -36,18 +37,19 @@ func _ready() -> void:
 	cmd_prompt_textedit = $"TerminalHistory/VBoxContainer/HBoxContainer/CmdPrompt"
 	terminal_history_scrollbar = $"TerminalHistory".get_v_scroll_bar()
 	telco_network = $"../TelcoNetwork"
-	terminal_noises = $"TerminalNoises"
+	terminal_noises = $"../SoundPlayer"
 
 	signal_bus = $"../SignalBus"
 	signal_bus.terminal_stdout.connect(add_to_history)
 	signal_bus.terminal_stderr.connect(_on_stderr)
-	signal_bus.change_telco.connect(_on_change_telco)
-	signal_bus.terminal_state.connect(_on_terminal_state)
+	signal_bus.terminal_change_telco.connect(_on_change_telco)
+	signal_bus.terminal_change_state.connect(_on_terminal_state)
 
 	last_sibling_index = vbox_container.get_child_count() - 2
 	connected_telco = "telco1"
 	terminal_state = TerminalState.TYPING
 	msg_buffer = []
+	mouse_default_cursor_shape = Control.CURSOR_ARROW
 
 	cmd_prompt_textedit.grab_focus()
 	print(vbox_container.get_tree_string_pretty())
@@ -71,8 +73,9 @@ func _process(delta: float) -> void:
 			var dialing_msg = "dialing" + ".".repeat(int(animation_timing / (1.0 / fps)) % num_frames)
 			animation_label.text = dialing_msg
 
-			if animation_timing > duration:
-				signal_bus.terminal_state.emit("TYPING")
+			terminal_state = TerminalState.TYPING
+		TerminalState.INACTIVE:
+			pass
 	
 	
 func _input(event):
@@ -103,6 +106,7 @@ func adjust_scrollbar() -> void:
 	if terminal_history_scrollbar != null:
 		terminal_history_container.scroll_vertical = int(terminal_history_scrollbar.max_value)
 
+
 func add_to_history(text: String, is_stderr: bool = false) -> void:
 	print("adding to history: ", text)
 	print("terminal state: ", TerminalState.keys()[terminal_state])
@@ -130,7 +134,7 @@ func _on_stderr(msg: String) -> void:
 
 
 func _on_change_telco(new_telco_name: String, username: String) -> void:
-	print("main: changing telco to ", username, "@", new_telco_name)
+	print("terminal: changing telco to ", username, "@", new_telco_name)
 	connected_telco = new_telco_name
 
 	var telcOS = telco_network.get_telco(connected_telco)
@@ -139,9 +143,11 @@ func _on_change_telco(new_telco_name: String, username: String) -> void:
 
 func _on_terminal_state(state: String) -> void:
 	terminal_state = TerminalState.get(state)
+	# print("terminal_state is now: ", terminal_state)
 
 	match terminal_state:
 		TerminalState.TYPING:
+			cmd_prompt_textedit.focus_mode = Control.FOCUS_ALL
 			cmd_prompt_textedit.grab_focus()
 			while msg_buffer.size() > 0:
 				var msg = msg_buffer.pop_front()
@@ -151,3 +157,6 @@ func _on_terminal_state(state: String) -> void:
 			animation_label = vbox_container.get_child(last_sibling_index)
 			cmd_prompt_textedit.release_focus()
 			signal_bus.play_sound.emit("dial")
+		TerminalState.INACTIVE:
+			cmd_prompt_textedit.focus_mode = Control.FOCUS_NONE
+			cmd_prompt_textedit.release_focus()

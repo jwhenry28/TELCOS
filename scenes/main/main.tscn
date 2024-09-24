@@ -65,7 +65,7 @@ horizontal_alignment = 1
 [node name="Stats" type="Panel" parent="."]
 offset_left = 640.0
 offset_top = 305.0
-offset_right = 1024.0
+offset_right = 1124.0
 offset_bottom = 548.0
 
 [node name="TelcoNetwork" parent="." instance=ExtResource("6_klq8m")]

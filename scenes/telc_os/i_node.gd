@@ -26,7 +26,7 @@ func initialize(new_filename:String, new_type:String, new_permissions:Dictionary
 
 
 func _ready() -> void:
-	print("iNode: ready")
+	pass
 
 
 func _process(_delta: float) -> void:

@@ -5,7 +5,7 @@
 [node name="Comms" type="Panel"]
 offset_left = 640.0
 offset_top = 32.0
-offset_right = 1024.0
+offset_right = 1124.0
 offset_bottom = 275.0
 script = ExtResource("1_x0l83")
 
@@ -13,7 +13,7 @@ script = ExtResource("1_x0l83")
 layout_mode = 0
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 368.0
+offset_right = 468.0
 offset_bottom = 227.0
 vertical_scroll_mode = 3
 

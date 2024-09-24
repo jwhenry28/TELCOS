@@ -1,21 +1,21 @@
 <telco name="telco3">
-    <users>
-        <user name="telco3" password="power" home="/home/telco3" />
-        <user name="sysadmin" password="password123" home="/home/sysadmin" />
-    </users>
+	<users>
+		<user name="telco3" password="power" home="/home/telco3" />
+		<user name="sysadmin" password="password123" home="/home/sysadmin" />
+	</users>
 	<shell builtins="help;whoami;users;pwd;ls;cd;cat;auth" guest="help;whoami;users;auth"></shell>
-    <filesys>
-        <inode name="" type="dir">
-            <inode name="home" type="dir">
-                <inode name="telco3" type="dir" permissions="telco3:rwx">
-                    <inode name=".trash" type="dir" permissions="telco3:rwx">
-                    </inode>
-                </inode>
-                <inode name="sysadmin" type="dir" permissions="sysadmin:rwx">
-                    <inode name=".trash" type="dir" permissions="sysadmin:rwx">
-                    </inode>
-                </inode>
-            </inode>
-        </inode>
-    </filesys>
+	<filesys>
+		<inode name="" type="dir">
+			<inode name="home" type="dir">
+				<inode name="telco3" type="dir" permissions="telco3:rwx">
+					<inode name=".trash" type="dir" permissions="telco3:rwx">
+					</inode>
+				</inode>
+				<inode name="sysadmin" type="dir" permissions="sysadmin:rwx">
+					<inode name=".trash" type="dir" permissions="sysadmin:rwx">
+					</inode>
+				</inode>
+			</inode>
+		</inode>
+	</filesys>
 </telco>

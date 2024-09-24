@@ -27,6 +27,7 @@ func _ready() -> void:
 			file_name = dir.get_next()
 	
 	# get_telco("telco1").initialize_session("dialer")
+	signal_bus.telco_command.connect(_on_telco_cmd)
 
 
 func get_telco(telco_name: String):
@@ -44,3 +45,7 @@ func run_cmd(telco_name: String, cmd: String) -> void:
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(_delta: float) -> void:
 	pass
+
+
+func _on_telco_cmd(telco: String, cmd: String, argv: Array, success: bool):
+	var new_entry = {"telco": telco, "cmd": cmd, "argv": argv, "success": success}

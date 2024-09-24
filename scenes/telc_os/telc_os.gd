@@ -180,6 +180,9 @@ func load_telco_xml(new_telco_name: String) -> void:
 						parent_path_array.remove_at(parent_path_array.size() - 1)
 						file_path = "/".join(parent_path_array)
 
+	users.register_user("guest", "guest", "", "")
+	initialize_session("guest")
+
 
 func add_to_filesystem(file_path:String, inode:iNode) -> bool:
 	var file_path_array = file_path.split('/')
@@ -248,6 +251,9 @@ func get_user_from_username(username: String) -> User:
 
 
 func authenticate_user(username: String, password: String) -> bool:
+	if username == "guest": 
+		return false
+	
 	var user = get_user_from_username(username)
 	if user == null:
 		return false
@@ -259,7 +265,7 @@ func authenticate_user(username: String, password: String) -> bool:
 
 
 func get_user_executables(username: String) -> Array[iNode]:
-	if username == "":
+	if username == "guest":
 		return []
 	
 	var executables: Array[iNode] = []
@@ -278,7 +284,7 @@ func get_user_executables(username: String) -> Array[iNode]:
 
 func get_user_commands(username: String) -> Array[String]:
 	var commands = []
-	if username == "":
+	if username == "guest":
 		commands = shell.guest_commands
 	else:
 		commands = shell.builtin_commands
@@ -312,15 +318,18 @@ func run_cmd(cmd_string: String) -> void:
 	var argv = cmd_args.slice(1)
 
 	var user_commands = get_user_commands(session.get_username())
+	var ret = false
 	if user_commands.has(cmd):
-		BINARIES[cmd].callback.call(cmd, argv)
+		ret = BINARIES[cmd].callback.call(cmd, argv)
+		session.user.add_to_history(cmd, argv, ret)
 		return
 
 	var executables = get_user_executables(session.get_username())
 	for exe in executables:
 		if exe.filename == cmd:
 			cmd = exe.get_executable()
-			BINARIES[cmd].callback.call(cmd, argv)
+			ret = BINARIES[cmd].callback.call(cmd, argv)
+			session.user.add_to_history(cmd, argv, ret)
 			return
 
 	var absolute_path = path_to_absolute(cmd)
@@ -331,7 +340,8 @@ func run_cmd(cmd_string: String) -> void:
 			return
 
 		cmd = executable_inode.get_executable()
-		BINARIES[cmd].callback.call(cmd, argv)
+		ret = BINARIES[cmd].callback.call(cmd, argv)
+		session.user.add_to_history(cmd, argv, ret)
 		return
 
 	stdout(cmd + ": command not found")
@@ -341,6 +351,8 @@ func run_service_cmd(cmd_string: String, source: String) -> void:
 	var cmd_args = cmd_string.split(' ')
 	var cmd = cmd_args[0]
 	var argv = cmd_args.slice(1)
+	
+	signal_bus.telco_command.emit(cmd, argv)
 
 	if SERVICES.has(cmd):
 		SERVICES[cmd].callback.call(cmd, argv, source)
@@ -367,7 +379,7 @@ var SERVICES: Dictionary = {
 	"msg.service": Cmd.new("msg.service", "Catches inbound messages", msg_service),
 }
 
-func help_cmd(_cmd: String, _argv: Array):
+func help_cmd(_cmd: String, _argv: Array) -> bool:
 	var msg = ""
 	var commands = get_user_commands(session.get_username())
 	var executables = get_user_executables(session.get_username())
@@ -381,29 +393,35 @@ func help_cmd(_cmd: String, _argv: Array):
 		msg += exe.filename.to_upper() + ": " + BINARIES[executable_key].help + "\n"
 	
 	stdout(msg)
+	return true
 
 
-func whoami_cmd(_cmd: String, _argv: Array):
+func whoami_cmd(_cmd: String, _argv: Array) -> bool:
 	var msg = ""
-	if session.get_username() == "":
+	if session.get_username() == "guest":
 		msg = "guest@" + telco_name + " (unauthenticated)"
 	else:
 		msg = session.get_username() + "@" + telco_name
+	
 	stdout(msg)
+	return true
 
 
-func users_cmd(_cmd: String, _argv: Array):
+func users_cmd(_cmd: String, _argv: Array) -> bool:
 	var msg = ""
 	for user in users.get_users():
 		msg += user.username + "\n"
+	
 	stdout(msg)
+	return true
 
 
-func pwd_cmd(_cmd: String, _argv: Array):
+func pwd_cmd(_cmd: String, _argv: Array) -> bool:
 	stdout(session.cwd)
+	return true
 
 
-func ls_cmd(_cmd: String, argv: Array):
+func ls_cmd(_cmd: String, argv: Array) -> bool:
 	var path = ""
 	var verbose = false
 
@@ -424,11 +442,11 @@ func ls_cmd(_cmd: String, argv: Array):
 	var target_inode = get_inode_from_path(absolute_path)
 	if target_inode == null:
 		stdout("no such file or directory: " + path)
-		return
+		return false
 
 	if !target_inode.verify_permissions(session.get_username(), "r"):
 		stderr("permission denied")
-		return
+		return false
 
 	if target_inode.type == "dir":
 		for child in target_inode.get_children():
@@ -443,14 +461,16 @@ func ls_cmd(_cmd: String, argv: Array):
 			stdout("-" + user_permissions + " " + target_inode.filename)
 		else:
 			stdout(target_inode.filename)
+	
+	return true
 
 
-func cd_cmd(_cmd: String, argv: Array):
+func cd_cmd(_cmd: String, argv: Array) -> bool:
 	var path = ""
 	if argv.size() == 0:
 		if session.user == null or session.user.home == "":
 			stdout("no home dir set")
-			return
+			return false
 		path = session.user.home
 	elif argv.size() == 1:
 		path = argv[0]
@@ -460,22 +480,24 @@ func cd_cmd(_cmd: String, argv: Array):
 	var target_inode = get_inode_from_path(absolute_path)
 	if target_inode == null:
 		stdout("no such file or directory")
-		return
+		return false
 
 	if !target_inode.verify_permissions(session.get_username(), "r"):
 		stderr("permission denied")
-		return
+		return false
 
 	if target_inode.type == "dir":
 		session.cwd = absolute_path
+		return true
 	else:
 		stdout("not a directory")
+		return false
 
 
-func cat_cmd(cmd: String, argv: Array):
+func cat_cmd(cmd: String, argv: Array) -> bool:
 	if argv.size() != 1:
 		stdout("usage: " + cmd + " <path>")
-		return
+		return false
 	
 	var path = argv[0]
 	var absolute_path = path_to_absolute(path)
@@ -483,24 +505,24 @@ func cat_cmd(cmd: String, argv: Array):
 	var target_inode = get_inode_from_path(absolute_path)
 	if target_inode == null:
 		stdout("no such file or directory")
-		return
+		return false
 	
 	if !target_inode.verify_permissions(session.get_username(), "r"):
 		stderr("permission denied")
-		return
+		return false
 
 	if target_inode.type == "file":
 		stdout(target_inode.get_content())
+		return true
 	else:
-		
 		stdout("not a file")
+		return false
 
 
-func auth_cmd(cmd: String, argv: Array):
+func auth_cmd(cmd: String, argv: Array) -> bool:
 	if argv.size() < 1 or argv[0].find(":") == -1:
-		
 		stdout("usage: " + cmd + " <username>:<password>")
-		return
+		return false
 	
 	var auth_string = argv[0]
 	var username = auth_string.split(':')[0]
@@ -508,22 +530,22 @@ func auth_cmd(cmd: String, argv: Array):
 
 	if get_user_from_username(username) == null:
 		stdout("user not found")
-		return
+		return false
 
 	if !authenticate_user(username, password):
 		stderr("invalid credentials")
-		return
+		return false
 	
 	initialize_session(username)
 	stdout("welcome, " + session.get_username()+ "!")
+	return true
 
 
-func dial_executable(_cmd: String, argv: Array):
+func dial_executable(_cmd: String, argv: Array) -> bool:
 	print("dial start")
 	if argv.size() != 1:
-		
 		stdout("no telco name provided")
-		return
+		return false
 	
 	var auth_string = argv[0]
 
@@ -537,15 +559,16 @@ func dial_executable(_cmd: String, argv: Array):
 	print("dialing telco: ", dst_telco)
 
 	stdout("dialing...")
-	signal_bus.terminal_state.emit("DIALING")
+	signal_bus.terminal_change_state.emit("DIALING")
 	send_network_data(telco_name, dst_telco, data)
 	telco_state = TelcoState.DIALING
+	return true
 
 
-func decryptor_executable(cmd: String, argv: Array):
+func decryptor_executable(cmd: String, argv: Array) -> bool:
 	if argv.size() != 1:
 		stdout("usage: " + cmd + " <path>")
-		return
+		return false
 	
 	var path = argv[0]
 	var absolute_path = path_to_absolute(path)
@@ -553,30 +576,32 @@ func decryptor_executable(cmd: String, argv: Array):
 
 	if target_inode == null:
 		stdout("no such file or directory")
-		return
+		return false
 	
 	if !target_inode.verify_permissions(session.get_username(), "r"):
 		stderr("permission denied")
-		return
+		return false
 	
 	if target_inode.type != "file":
 		stdout("not a file")
-		return
+		return false
 	
 	if !target_inode.properties.has("encrypted"):
 		stdout("file is not encrypted")
-		return
+		return false
 	
 	target_inode.properties.erase("encrypted")
 	stdout("successfully decrypted " + target_inode.filename)
+	return true
 
 
-func msg_service(_cmd: String, argv: Array, _source: String):
+func msg_service(_cmd: String, argv: Array, _source: String) -> bool:
 	var msg = argv[0]
 	stdout(msg)
+	return true
 
 
-func dial_service(_cmd: String, argv: Array, source: String):
+func dial_service(_cmd: String, argv: Array, source: String) -> bool:
 	var auth_string = argv[0]
 	var username = auth_string.split(":")[0]
 	var tmp = auth_string.split(":")[1]
@@ -584,7 +609,9 @@ func dial_service(_cmd: String, argv: Array, source: String):
 	var auth_telco_name = tmp.split("@")[1]
 
 	if authenticate_user(username, password):
-		signal_bus.change_telco.emit(auth_telco_name, username)
+		signal_bus.terminal_change_telco.emit(auth_telco_name, username)
 		stdout(auth_telco_name + ": welcome " + username + "!")
+		return true
 	else:
 		stderr("unauthorized")
+		return false

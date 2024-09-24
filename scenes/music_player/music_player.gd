@@ -20,7 +20,9 @@ func _ready() -> void:
 		while file_name != "":
 			if !dir.current_is_dir() and file_name.ends_with(".mp3"):
 				var new_song = AudioStreamPlayer.new()
-				new_song.name = file_name.substr(0, -4)
+				var song_name = file_name.substr(0, file_name.length() - 4)
+				print("using: " + song_name)
+				new_song.name = song_name
 				new_song.stream = load("res://assets/music/" + file_name)
 				add_child(new_song)
 				num_songs += 1

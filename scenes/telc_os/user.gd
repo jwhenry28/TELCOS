@@ -1,5 +1,7 @@
 class_name User extends Node
 
+var terminal_history: Array[Dictionary]
+
 var username: String
 var password: String
 var home: String
@@ -27,3 +29,10 @@ func _process(_delta: float) -> void:
 
 func _to_string() -> String:
 	return username + ":" + password + " " + home + " " + path
+
+
+func add_to_history(cmd: String, argv: Array, success: bool):
+	terminal_history.append({"cmd": cmd, "argv": argv, "success": success})
+	print("terminal history is now:")
+	for item in terminal_history:
+		print(item["cmd"] + " " + "".join(item["argv"]) + " (" + str(item["success"]) + ")")
