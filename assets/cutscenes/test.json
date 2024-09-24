@@ -2,8 +2,8 @@
 	"elements": [
 		{"type": "dialogue", "speaker": "execut0r", "text": "yeah one sec, log onto the sandbox machine"},
 		{"type": "action", "callback": "change_telco", "args": ["sandbox"]},
-		{"type": "pause", "duration": 2.5},
 		{"type": "action", "callback": "play_sound", "args": ["dial"]},
+		{"type": "pause", "duration": 2.5},
 		{"type": "dialogue", "speaker": "execut0r", "text": "cool, so the first thing to run is the 'help' command"},
 		{"type": "dialogue", "speaker": "execut0r", "text": "that will show u all the other commands you can run, as the current user on that machine"},
 		{"type": "dialogue", "speaker": "execut0r", "text": "go ahead, run it here"},
