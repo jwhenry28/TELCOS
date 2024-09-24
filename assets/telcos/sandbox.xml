@@ -10,7 +10,9 @@
 					<inode name="readme.txt" type="file">
 						Congratulations, you've read this file!
 					</inode>
-					<inode name=".trash" type="dir" />
+					<inode name=".trash" type="dir">
+						<inode name="old.txt" type="file">This is an old file</inode>
+					</inode>
 				</inode>
 			</inode>
 		</inode>

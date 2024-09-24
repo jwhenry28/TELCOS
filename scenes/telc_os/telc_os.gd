@@ -561,7 +561,6 @@ func dial_executable(_cmd: String, argv: Array) -> bool:
 	stdout("dialing...")
 	signal_bus.terminal_change_state.emit("DIALING")
 	send_network_data(telco_name, dst_telco, data)
-	telco_state = TelcoState.DIALING
 	return true
 
 
@@ -610,7 +609,7 @@ func dial_service(_cmd: String, argv: Array, source: String) -> bool:
 
 	if authenticate_user(username, password):
 		signal_bus.terminal_change_telco.emit(auth_telco_name, username)
-		stdout(auth_telco_name + ": welcome " + username + "!")
+		stdout("WELCOME TO " + auth_telco_name.to_upper() + ". TYPE 'HELP' TO BEGIN:")
 		return true
 	else:
 		stderr("unauthorized")

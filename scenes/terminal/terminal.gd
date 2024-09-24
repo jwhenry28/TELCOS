@@ -9,6 +9,7 @@ enum TerminalState {
 const TERMINAL_GREEN: Color = Color8(57, 255, 20, 255)
 const BG_TERMINAL_GREEN: Color = Color8(11, 50, 4, 255)
 const FONT_SIZE: int = 12
+const DIAL_DURATION: float = 3.0
 
 var last_sibling_index: int
 var old_max_scroll_height: float = 0.0
@@ -43,7 +44,7 @@ func _ready() -> void:
 	signal_bus.terminal_stdout.connect(add_to_history)
 	signal_bus.terminal_stderr.connect(_on_stderr)
 	signal_bus.terminal_change_telco.connect(_on_change_telco)
-	signal_bus.terminal_change_state.connect(_on_terminal_state)
+	signal_bus.terminal_change_state.connect(_on_terminal_state_change)
 
 	last_sibling_index = vbox_container.get_child_count() - 2
 	connected_telco = "telco1"
@@ -70,10 +71,12 @@ func _process(delta: float) -> void:
 			var num_frames: int = 3
 			var duration: int = 3
 			animation_timing += delta
-			var dialing_msg = "dialing" + ".".repeat(int(animation_timing / (1.0 / fps)) % num_frames)
+			var num_dots = int(animation_timing / (1.0 / fps)) % num_frames
+			var dialing_msg = "dialing" + ".".repeat(num_dots)
 			animation_label.text = dialing_msg
 
-			terminal_state = TerminalState.TYPING
+			if animation_timing > DIAL_DURATION:
+				_on_terminal_state_change("TYPING")
 		TerminalState.INACTIVE:
 			pass
 	
@@ -126,6 +129,7 @@ func add_to_history(text: String, is_stderr: bool = false) -> void:
 			terminal_noises.get_node("stderr").play()
 	else:
 		var msg = {"text": text, "is_stderr": is_stderr}
+		print("adding to buffer: ", msg)
 		msg_buffer.append(msg)
 
 
@@ -141,7 +145,7 @@ func _on_change_telco(new_telco_name: String, username: String) -> void:
 	telcOS.initialize_session(username)
 
 
-func _on_terminal_state(state: String) -> void:
+func _on_terminal_state_change(state: String) -> void:
 	terminal_state = TerminalState.get(state)
 	# print("terminal_state is now: ", terminal_state)
 

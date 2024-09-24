@@ -12,8 +12,8 @@ func _ready() -> void:
 	telco_network = $"TelcoNetwork"
 	signal_bus = $"SignalBus"
 
-	# print(get_tree_string_pretty())
-	# $"Comms".play_cutscene("test")
+	print(get_tree_string_pretty())
+	$"Comms".play_cutscene("test")
 	print("main: done\n\n")
 
 
@@ -34,12 +34,15 @@ func handle_query(query: Dictionary) -> bool:
 		"last_cmd":
 			var cmd = ""
 			var argv = []
+			var argv_contains_all = []
 			var success = true
 
 			if "cmd" in args:
 				cmd = args["cmd"]
 			if "argv" in args:
 				argv = args["argv"]
+			if "argv_contains_all" in args:
+				argv_contains_all = args["argv_contains_all"]
 			if "success" in args:
 				success = args["success"]
 			
@@ -51,7 +54,16 @@ func handle_query(query: Dictionary) -> bool:
 			print("last_cmd: ", last_cmd)
 
 			ret = last_cmd["cmd"] == cmd and last_cmd["success"] == success
-			# TODO - check argv
+			
+			if ret:
+				for arg in argv_contains_all:
+					print("checking: ", arg)
+					print("last_cmd.argv: ", last_cmd["argv"])
+					print("result: ", last_cmd["argv"].find(arg))
+					if last_cmd["argv"].find(arg) == -1:
+						ret = false
+						print("didnt find it")
+						break
 		"current_user":
 			var username = ""
 
@@ -60,6 +72,7 @@ func handle_query(query: Dictionary) -> bool:
 			
 			print("comparing ", username, " to ", telco.session.user.username)
 			ret = username == telco.session.user.username
-			
+	
+	print("query result: ", ret)
 	return ret
 			

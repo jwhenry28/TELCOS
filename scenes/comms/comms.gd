@@ -121,6 +121,8 @@ func handle_action(action: String, args: Array):
 		"change_telco":
 			print("comms: changing telco: " + args[0])
 			signal_bus.terminal_change_telco.emit(args[0], "guest")
+		"terminal_stdout":
+			signal_bus.terminal_stdout.emit(args[0])
 
 	comm_state = CommState.READY
 
