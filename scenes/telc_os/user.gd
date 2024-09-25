@@ -33,6 +33,3 @@ func _to_string() -> String:
 
 func add_to_history(cmd: String, argv: Array, success: bool):
 	terminal_history.append({"cmd": cmd, "argv": argv, "success": success})
-	print("terminal history is now:")
-	for item in terminal_history:
-		print(item["cmd"] + " " + "".join(item["argv"]) + " (" + str(item["success"]) + ")")

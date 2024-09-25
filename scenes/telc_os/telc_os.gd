@@ -312,6 +312,7 @@ func receive_network_data(source: String, destination: String, data: String) -> 
 	run_service_cmd(data, source)
 
 
+# TODO - clean up this logic? It's ugly and unwieldy, even though it works
 func run_cmd(cmd_string: String) -> void:
 	var cmd_args = cmd_string.split(' ')
 	var cmd = cmd_args[0]
@@ -319,9 +320,12 @@ func run_cmd(cmd_string: String) -> void:
 
 	var user_commands = get_user_commands(session.get_username())
 	var ret = false
+	session.user.add_to_history(cmd, argv, ret)
+	var current_cmd = session.user.terminal_history[-1]
+
 	if user_commands.has(cmd):
 		ret = BINARIES[cmd].callback.call(cmd, argv)
-		session.user.add_to_history(cmd, argv, ret)
+		current_cmd["success"] = ret
 		return
 
 	var executables = get_user_executables(session.get_username())
@@ -329,7 +333,7 @@ func run_cmd(cmd_string: String) -> void:
 		if exe.filename == cmd:
 			cmd = exe.get_executable()
 			ret = BINARIES[cmd].callback.call(cmd, argv)
-			session.user.add_to_history(cmd, argv, ret)
+			current_cmd["success"] = ret
 			return
 
 	var absolute_path = path_to_absolute(cmd)
@@ -341,7 +345,7 @@ func run_cmd(cmd_string: String) -> void:
 
 		cmd = executable_inode.get_executable()
 		ret = BINARIES[cmd].callback.call(cmd, argv)
-		session.user.add_to_history(cmd, argv, ret)
+		current_cmd["success"] = ret
 		return
 
 	stdout(cmd + ": command not found")
@@ -352,10 +356,10 @@ func run_service_cmd(cmd_string: String, source: String) -> void:
 	var cmd = cmd_args[0]
 	var argv = cmd_args.slice(1)
 	
-	signal_bus.telco_command.emit(cmd, argv)
 
 	if SERVICES.has(cmd):
-		SERVICES[cmd].callback.call(cmd, argv, source)
+		var ret = SERVICES[cmd].callback.call(cmd, argv, source)
+		signal_bus.telco_command.emit(source, cmd, argv, ret)
 		return
 	else:
 		return

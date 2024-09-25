@@ -12,8 +12,8 @@ func _ready() -> void:
 	telco_network = $"TelcoNetwork"
 	signal_bus = $"SignalBus"
 
-	print(get_tree_string_pretty())
-	$"Comms".play_cutscene("test")
+	# print(get_tree_string_pretty())
+	# $"Comms".play_cutscene("test")
 	print("main: done\n\n")
 
 

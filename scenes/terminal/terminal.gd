@@ -13,6 +13,7 @@ const DIAL_DURATION: float = 2.5
 
 var next_msg_index: int
 var old_max_scroll_height: float = 0.0
+var cmd_history_index: int = 0
 
 var terminal_history_container: ScrollContainer
 var vbox_container: VBoxContainer
@@ -68,11 +69,8 @@ func _process(delta: float) -> void:
 		TerminalState.TYPING:
 			pass
 		TerminalState.DIALING:
-			print("dialing")
-			print("animation_timing: ", animation_timing)
 			var fps: float = 3.0
 			var num_frames: int = 3
-			var duration: int = 3
 			animation_timing += delta
 			var num_dots = int(animation_timing / (1.0 / fps)) % num_frames
 			var dialing_msg = "dialing" + ".".repeat(num_dots)
@@ -87,26 +85,45 @@ func _process(delta: float) -> void:
 	
 func _input(event):
 	if event is InputEventKey and event.is_pressed() and !event.is_echo():
-		if event.keycode == KEY_ENTER:
-			signal_bus.play_sound.emit("enter")
-		elif event.keycode == KEY_BACKSPACE:
-			signal_bus.play_sound.emit("backspace")
-		else:
-			signal_bus.play_sound.emit("key")
+		match event.keycode:
+			KEY_ENTER:
+				signal_bus.play_sound.emit("enter")
+			KEY_BACKSPACE:
+				signal_bus.play_sound.emit("backspace")
+			KEY_UP:
+				var terminal_history = telco_network.get_telco(connected_telco).session.user.terminal_history
+				if terminal_history.size() > 0 and cmd_history_index > 0:
+					cmd_history_index -= 1
+					var last_cmd = terminal_history[cmd_history_index]
+					var last_cmd_text = last_cmd["cmd"]
+					if last_cmd["argv"].size() > 0:
+						last_cmd_text += " " + " ".join(last_cmd["argv"])
+					cmd_prompt_textedit.set_line(0, last_cmd_text)
+			KEY_DOWN:
+				var terminal_history = telco_network.get_telco(connected_telco).session.user.terminal_history
+				if terminal_history.size() > 0 and cmd_history_index < terminal_history.size() - 1:
+					cmd_history_index += 1
+					var last_cmd = terminal_history[cmd_history_index]
+					var last_cmd_text = last_cmd["cmd"]
+					if last_cmd["argv"].size() > 0:
+						last_cmd_text += " " + " ".join(last_cmd["argv"])
+					cmd_prompt_textedit.set_line(0, last_cmd_text)
+			_:
+				signal_bus.play_sound.emit("key")
 
-	if Input.is_action_just_released("cmd_enter"):
-		print("consuming textedit")
+	if Input.is_action_just_released("cmd_enter"): # for whatever reason, Godot renders the cursor in the wrong location if we use just_pressed for enter
 		var cmd = consume_text().strip_edges(true, true)
 		add_to_history("> " + cmd)
 		
 		telco_network.run_cmd(connected_telco, cmd)
+		cmd_history_index = telco_network.get_telco(connected_telco).session.user.terminal_history.size()
 
 
 func consume_text() -> String:
-		var cmd = cmd_prompt_textedit.text
-		cmd_prompt_textedit.text = ''
-		
-		return cmd
+	var cmd = cmd_prompt_textedit.text
+	cmd_prompt_textedit.text = ""
+	
+	return cmd
 
 
 func adjust_scrollbar() -> void:
@@ -124,6 +141,7 @@ func add_to_history(text: String, is_stderr: bool = false) -> void:
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD
 		label.add_theme_color_override("font_color", TERMINAL_GREEN)
 		label.add_theme_font_size_override("font_size", FONT_SIZE)
+
 		
 		print("next_msg_index: ", next_msg_index)
 		# var last_sibling = vbox_container.get_child(next_msg_index)

@@ -63,9 +63,6 @@ func play_cutscene(cutscene_name: String) -> void:
 	cutscene = JSON.parse_string(json_string)
 
 	get_tree().call_group("cutscene_labels", "queue_free")
-	var new_label = Label.new()
-	new_label.add_to_group("cutscene_labels")
-	vbox_container.add_child(new_label)
 
 	comm_state = CommState.READY
 
@@ -73,8 +70,10 @@ func play_cutscene(cutscene_name: String) -> void:
 func advance_cutscene() -> void:
 	current_element = cutscene["elements"].pop_front()
 	if current_element == null:
+		print("Cutscene Finished")
+		for label in vbox_container.get_children():
+			print(label.position)
 		comm_state = CommState.INACTIVE
-		# signal_bus.terminal_change_state.emit("TYPING")
 		return
 	
 	print("comms: processing ", current_element)
