@@ -74,7 +74,7 @@ func advance_cutscene() -> void:
 	current_element = cutscene["elements"].pop_front()
 	if current_element == null:
 		comm_state = CommState.INACTIVE
-		signal_bus.terminal_change_state.emit("TYPING")
+		# signal_bus.terminal_change_state.emit("TYPING")
 		return
 	
 	print("comms: processing ", current_element)
@@ -120,7 +120,8 @@ func handle_action(action: String, args: Array):
 			signal_bus.play_sound.emit(args[0])
 		"change_telco":
 			print("comms: changing telco: " + args[0])
-			signal_bus.terminal_change_telco.emit(args[0], "guest")
+			$"../Terminal".terminal_dial(args[0], "guest")
+			# signal_bus.terminal_change_telco.emit(args[0], "guest")
 		"terminal_stdout":
 			signal_bus.terminal_stdout.emit(args[0])
 

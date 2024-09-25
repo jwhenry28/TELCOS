@@ -3,9 +3,7 @@
 		{"type": "dialogue", "speaker": "execut0r", "text": "ok, that's all u need to know."},
 		{"type": "pause", "duration": 1.0},
 		{"type": "dialogue", "speaker": "execut0r", "text": "i'm connecting you to TELCO1 rn. the creds I found are telco1:telco1"},
-		{"type": "action", "callback": "change_telco", "args": ["telco1"]},
+		{"type": "action", "callback": "change_telco", "args": ["sandbox"]},
 		{"type": "action", "callback": "play_sound", "args": ["dial"]},
-		{"type": "pause", "duration": 2.5},
-		{"type": "action", "callback": "terminal_stdout", "args": ["WELCOME TO TELCO1. TYPE 'HELP' TO BEGIN:"]},
 	]
 }

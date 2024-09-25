@@ -180,7 +180,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 						parent_path_array.remove_at(parent_path_array.size() - 1)
 						file_path = "/".join(parent_path_array)
 
-	users.register_user("guest", "guest", "", "")
+	users.register_user("guest", "", "", "")
 	initialize_session("guest")
 
 
@@ -251,8 +251,8 @@ func get_user_from_username(username: String) -> User:
 
 
 func authenticate_user(username: String, password: String) -> bool:
-	if username == "guest": 
-		return false
+	# if username == "guest": 
+	# 	return false
 	
 	var user = get_user_from_username(username)
 	if user == null:
@@ -600,15 +600,18 @@ func msg_service(_cmd: String, argv: Array, _source: String) -> bool:
 	return true
 
 
-func dial_service(_cmd: String, argv: Array, source: String) -> bool:
+func dial_service(_cmd: String, argv: Array, _source: String) -> bool:
 	var auth_string = argv[0]
 	var username = auth_string.split(":")[0]
 	var tmp = auth_string.split(":")[1]
 	var password = tmp.split("@")[0]
 	var auth_telco_name = tmp.split("@")[1]
 
+	print("dial.service: authenticating " + username)
+
 	if authenticate_user(username, password):
 		signal_bus.terminal_change_telco.emit(auth_telco_name, username)
+		initialize_session(username)
 		stdout("WELCOME TO " + auth_telco_name.to_upper() + ". TYPE 'HELP' TO BEGIN:")
 		return true
 	else:

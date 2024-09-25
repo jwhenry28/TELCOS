@@ -9,9 +9,9 @@ enum TerminalState {
 const TERMINAL_GREEN: Color = Color8(57, 255, 20, 255)
 const BG_TERMINAL_GREEN: Color = Color8(11, 50, 4, 255)
 const FONT_SIZE: int = 12
-const DIAL_DURATION: float = 3.0
+const DIAL_DURATION: float = 2.5
 
-var last_sibling_index: int
+var next_msg_index: int
 var old_max_scroll_height: float = 0.0
 
 var terminal_history_container: ScrollContainer
@@ -46,7 +46,8 @@ func _ready() -> void:
 	signal_bus.terminal_change_telco.connect(_on_change_telco)
 	signal_bus.terminal_change_state.connect(_on_terminal_state_change)
 
-	last_sibling_index = vbox_container.get_child_count() - 2
+	next_msg_index = vbox_container.get_child_count() - 1
+	print("next_msg_index: ", next_msg_index)
 	connected_telco = "telco1"
 	terminal_state = TerminalState.TYPING
 	msg_buffer = []
@@ -67,6 +68,8 @@ func _process(delta: float) -> void:
 		TerminalState.TYPING:
 			pass
 		TerminalState.DIALING:
+			print("dialing")
+			print("animation_timing: ", animation_timing)
 			var fps: float = 3.0
 			var num_frames: int = 3
 			var duration: int = 3
@@ -76,6 +79,7 @@ func _process(delta: float) -> void:
 			animation_label.text = dialing_msg
 
 			if animation_timing > DIAL_DURATION:
+				print("exceeded duration")
 				_on_terminal_state_change("TYPING")
 		TerminalState.INACTIVE:
 			pass
@@ -113,7 +117,7 @@ func adjust_scrollbar() -> void:
 func add_to_history(text: String, is_stderr: bool = false) -> void:
 	print("adding to history: ", text)
 	print("terminal state: ", TerminalState.keys()[terminal_state])
-	if terminal_state == TerminalState.TYPING:
+	if terminal_state == TerminalState.TYPING or terminal_state == TerminalState.INACTIVE:
 		var label = Label.new()
 		label.name = text
 		label.text = text
@@ -121,9 +125,14 @@ func add_to_history(text: String, is_stderr: bool = false) -> void:
 		label.add_theme_color_override("font_color", TERMINAL_GREEN)
 		label.add_theme_font_size_override("font_size", FONT_SIZE)
 		
-		var last_sibling = vbox_container.get_child(last_sibling_index)
-		last_sibling_index += 1
-		last_sibling.add_sibling(label)
+		print("next_msg_index: ", next_msg_index)
+		# var last_sibling = vbox_container.get_child(next_msg_index)
+		# print("adding sibling to: ", last_sibling.name)
+		# next_msg_index += 1
+		# last_sibling.add_sibling(label)
+		vbox_container.add_child(label)
+		vbox_container.move_child(label, next_msg_index)
+		next_msg_index += 1
 
 		if is_stderr:
 			terminal_noises.get_node("stderr").play()
@@ -131,6 +140,13 @@ func add_to_history(text: String, is_stderr: bool = false) -> void:
 		var msg = {"text": text, "is_stderr": is_stderr}
 		print("adding to buffer: ", msg)
 		msg_buffer.append(msg)
+
+
+func terminal_dial(telco_name: String, username: String = "guest", password: String = "") -> void:
+	add_to_history("dialing...")
+	_on_terminal_state_change("DIALING")
+	var data = "dial.service " + username + ":" + password + "@" + telco_name
+	signal_bus.network_data.emit("terminal", telco_name, data)
 
 
 func _on_stderr(msg: String) -> void:
@@ -141,13 +157,13 @@ func _on_change_telco(new_telco_name: String, username: String) -> void:
 	print("terminal: changing telco to ", username, "@", new_telco_name)
 	connected_telco = new_telco_name
 
-	var telcOS = telco_network.get_telco(connected_telco)
-	telcOS.initialize_session(username)
+	# var telcOS = telco_network.get_telco(connected_telco)
+	# telcOS.initialize_session(username)
 
 
 func _on_terminal_state_change(state: String) -> void:
 	terminal_state = TerminalState.get(state)
-	# print("terminal_state is now: ", terminal_state)
+	print("terminal_state is now: ", terminal_state)
 
 	match terminal_state:
 		TerminalState.TYPING:
@@ -158,7 +174,8 @@ func _on_terminal_state_change(state: String) -> void:
 				add_to_history(msg.text, msg.is_stderr)
 		TerminalState.DIALING:
 			animation_timing = 0.0
-			animation_label = vbox_container.get_child(last_sibling_index)
+			print("animation_label: ", vbox_container.get_child(next_msg_index-1).name)
+			animation_label = vbox_container.get_child(next_msg_index-1)
 			cmd_prompt_textedit.release_focus()
 			signal_bus.play_sound.emit("dial")
 		TerminalState.INACTIVE:
