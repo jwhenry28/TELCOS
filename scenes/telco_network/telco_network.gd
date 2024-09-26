@@ -26,8 +26,7 @@ func _ready() -> void:
 				print("telco added")
 			file_name = dir.get_next()
 	
-	# get_telco("telco1").initialize_session("dialer")
-	signal_bus.telco_command.connect(_on_telco_cmd)
+	$"../Terminal".terminal_dial("telco3", "telco3", "password123")
 
 
 func get_telco(telco_name: String):

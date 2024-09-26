@@ -19,6 +19,7 @@ class Cmd:
 		self.callback = new_callback
 
 
+var telco_network
 var telco_name: String
 var users: UsersDirectory
 var filesys: FileSystem
@@ -26,12 +27,14 @@ var session: Session
 var shell: Shell
 var signal_bus: Node
 var telco_state: TelcoState
+var services: Array[Dictionary]
 
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	print("telcOS: loading")
 	filesys = $"FileSystem"
+	telco_network = $"../../TelcoNetwork"
 	print("telcOS: done")
 
 
@@ -82,6 +85,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 	
 	var file_path = ''
 	var current_inode = null
+	services = []
 
 	while parser.read() != ERR_FILE_EOF:
 		match parser.get_node_type():
@@ -108,6 +112,14 @@ func load_telco_xml(new_telco_name: String) -> void:
 						var guest = attributes_dict.get('guest', '').split(';')
 						shell.assign_builtin_cmds(builtins)
 						shell.assign_guest_cmds(guest)
+					'services':
+						pass
+					'service':
+						var service_name = attributes_dict.get('name')
+						var service_status = attributes_dict.get('status', "running")
+						var service_visibility = attributes_dict.get('visible', "true")
+						assert(service_name in SERVICES, telco_name + ": service not implemented: " + service_name)
+						services.append({"name": service_name, "visible": service_visibility == "true", "status": service_status})
 					'filesys':
 						pass
 					'inode':
@@ -276,9 +288,11 @@ func get_user_executables(username: String) -> Array[iNode]:
 		if dir_inode == null or !dir_inode.verify_permissions(username, "r"):
 			continue
 		for child in dir_inode.get_children():
+			print("checking: " + child.filename)
 			if child.type == "executable" and child.verify_permissions(username, "x"):
 				executables.append(child)
 
+	print(executables)
 	return executables
 
 
@@ -314,55 +328,77 @@ func receive_network_data(source: String, destination: String, data: String) -> 
 
 # TODO - clean up this logic? It's ugly and unwieldy, even though it works
 func run_cmd(cmd_string: String) -> void:
-	var cmd_args = cmd_string.split(' ')
-	var cmd = cmd_args[0]
-	var argv = cmd_args.slice(1)
+	match shell.state:
+		0: # ShellState.LOCAL
+			var cmd_args = cmd_string.split(' ')
+			var cmd = cmd_args[0]
+			var argv = cmd_args.slice(1)
 
-	var user_commands = get_user_commands(session.get_username())
-	var ret = false
-	session.user.add_to_history(cmd, argv, ret)
-	var current_cmd = session.user.terminal_history[-1]
+			var user_commands = get_user_commands(session.get_username())
+			var ret = false
+			session.user.add_to_history(cmd, argv, ret)
+			var current_cmd = session.user.terminal_history[-1]
 
-	if user_commands.has(cmd):
-		ret = BINARIES[cmd].callback.call(cmd, argv)
-		current_cmd["success"] = ret
-		return
+			if user_commands.has(cmd):
+				ret = BINARIES[cmd].callback.call(cmd, argv)
+				current_cmd["success"] = ret
+				return
 
-	var executables = get_user_executables(session.get_username())
-	for exe in executables:
-		if exe.filename == cmd:
-			cmd = exe.get_executable()
-			ret = BINARIES[cmd].callback.call(cmd, argv)
-			current_cmd["success"] = ret
-			return
+			var executables = get_user_executables(session.get_username())
+			for exe in executables:
+				if exe.filename == cmd:
+					cmd = exe.get_executable()
+					ret = BINARIES[cmd].callback.call(cmd, argv)
+					current_cmd["success"] = ret
+					return
 
-	var absolute_path = path_to_absolute(cmd)
-	var executable_inode = get_inode_from_path(absolute_path)
-	if executable_inode != null and BINARIES.has(executable_inode.get_executable()):
-		if !executable_inode.verify_permissions(session.get_username(), "x"):
-			stderr("permission denied")
-			return
+			var absolute_path = path_to_absolute(cmd)
+			var executable_inode = get_inode_from_path(absolute_path)
+			if executable_inode != null and BINARIES.has(executable_inode.get_executable()):
+				if !executable_inode.verify_permissions(session.get_username(), "x"):
+					stderr("permission denied")
+					return
 
-		cmd = executable_inode.get_executable()
-		ret = BINARIES[cmd].callback.call(cmd, argv)
-		current_cmd["success"] = ret
-		return
+				cmd = executable_inode.get_executable()
+				ret = BINARIES[cmd].callback.call(cmd, argv)
+				current_cmd["success"] = ret
+				return
 
-	stdout(cmd + ": command not found")
+			stdout(cmd + ": command not found")
+		1: # ShellState.REMOTE
+			if cmd_string == "exit":
+				shell.state = 0
+				shell.connected_telco = ""
+				shell.connected_service = ""
+				stdout("disconnected")
+			
+			send_network_data(telco_name, shell.connected_telco, shell.connected_service + " " + cmd_string)
 
 
 func run_service_cmd(cmd_string: String, source: String) -> void:
 	var cmd_args = cmd_string.split(' ')
 	var cmd = cmd_args[0]
 	var argv = cmd_args.slice(1)
-	
 
-	if SERVICES.has(cmd):
-		var ret = SERVICES[cmd].callback.call(cmd, argv, source)
-		signal_bus.telco_command.emit(source, cmd, argv, ret)
-		return
-	else:
-		return
+	for service in services:
+		if service["name"] == cmd and SERVICES.has(cmd):
+			match service["status"]:
+				"running":
+					SERVICES[cmd].callback.call(cmd, argv, source)
+				"stopped":
+					stderr("(" + cmd + " not running on " + telco_name + ")")
+				_:
+					pass
+
+
+func service_exists(service_name, status="") -> bool:
+	for service in services:
+		if service["name"] == service_name:
+			if status != "":
+				return service["status"] == status
+			else:
+				return true
+	return false
 
 
 var BINARIES: Dictionary = {
@@ -374,13 +410,16 @@ var BINARIES: Dictionary = {
 	"cd": Cmd.new("cd", "Changes the current working directory", cd_cmd),
 	"cat": Cmd.new("cat", "Prints the content of a file", cat_cmd),
 	"auth": Cmd.new("auth", "Authenticates the user", auth_cmd),
+	"ps": Cmd.new("ps", "Displays all running services", ps_cmd),
 	"dial_standard": Cmd.new("dial", "Dial a new telco", dial_executable),
 	"decryptor_standard": Cmd.new("decryptor", "Decrypts a file", decryptor_executable),
+	"telnet_standard": Cmd.new("telnet", "Sends network data to a provided telco service", telnet_executable),
 }
 
 var SERVICES: Dictionary = {
 	"dial.service": Cmd.new("dial.service", "Handles incoming calls", dial_service),
-	"msg.service": Cmd.new("msg.service", "Catches inbound messages", msg_service),
+	"echo.service": Cmd.new("echo.service", "Returns inbound messages", echo_service),
+	"vault.service": Cmd.new("vault.service", "???", vault_service),
 }
 
 func help_cmd(_cmd: String, _argv: Array) -> bool:
@@ -545,6 +584,17 @@ func auth_cmd(cmd: String, argv: Array) -> bool:
 	return true
 
 
+func ps_cmd(_cmd: String, _argv: Array) -> bool:
+	var msg = ""
+	for service in services:
+		if service["visible"]:
+			msg += SERVICES[service["name"]].name + " (" + service["status"] + ")" + "\n"
+
+	if msg != "":
+		stdout(msg)
+	return true
+
+
 func dial_executable(_cmd: String, argv: Array) -> bool:
 	print("dial start")
 	if argv.size() != 1:
@@ -598,9 +648,29 @@ func decryptor_executable(cmd: String, argv: Array) -> bool:
 	return true
 
 
-func msg_service(_cmd: String, argv: Array, _source: String) -> bool:
-	var msg = argv[0]
-	stdout(msg)
+func telnet_executable(cmd: String, argv: Array) -> bool:
+	if argv.size() < 1:
+		stdout("(usage) " + cmd + " <service_name>[@<telco_name>]")
+		return false
+	
+	var dst = argv[0]
+
+	var dst_service = dst
+	var dst_telco = telco_name
+
+	if dst.find('@') != -1:
+		dst_service = dst.split('@')[0]
+		dst_telco = dst.split('@')[1]
+
+	if !telco_network.get_telco(dst_telco).service_exists(dst_service, "running"):
+		stderr("service not running")
+		return false
+
+	stdout("connected to " + dst_telco + ":" + dst_service + ". type 'exit' to disconnect")
+	shell.state = 1
+	shell.connected_telco = dst_telco
+	shell.connected_service = dst_service
+
 	return true
 
 
@@ -621,3 +691,14 @@ func dial_service(_cmd: String, argv: Array, _source: String) -> bool:
 	else:
 		stderr("unauthorized")
 		return false
+
+
+func echo_service(_cmd: String, argv: Array, _source: String) -> bool:
+	print("received echo data: ", argv)
+	var msg = " ".join(argv)
+	stdout(msg)
+	return true
+
+
+func vault_service(_cmd: String, _argv: Array, _source: String) -> bool:
+	return true

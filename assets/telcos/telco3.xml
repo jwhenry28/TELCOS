@@ -1,18 +1,56 @@
 <telco name="telco3">
 	<users>
-		<user name="telco3" password="power" home="/home/telco3" />
-		<user name="sysadmin" password="password123" home="/home/sysadmin" />
+		<user name="telco3" password="password123" home="/home/telco3" path="/bin:/home/telco3" />
+		<user name="sysadmin" password="power" home="/home/sysadmin" path="/bin:/home/sysadmin" />
 	</users>
-	<shell builtins="help;whoami;users;pwd;ls;cd;cat;auth" guest="help;whoami;users;auth"></shell>
+	<shell builtins="help;whoami;users;pwd;ls;cd;cat;auth;ps" guest="help;whoami;users;auth"></shell>
+	<services>
+		<service name="dial.service" visible="false"></service>
+		<service name="echo.service"></service>
+		<service name="vault.service"></service>
+	</services>
 	<filesys>
 		<inode name="" type="dir">
+			<inode name="bin" type="dir" permissions="*:r-x">
+				<inode name="telnet" type="executable">
+					telnet_standard
+				</inode>
+			</inode>
 			<inode name="home" type="dir">
 				<inode name="telco3" type="dir" permissions="telco3:rwx">
-					<inode name=".trash" type="dir" permissions="telco3:rwx">
+					<inode name="services.txt" type="file">
+						----- TELNIX MANUAL PAGE -----
+						(5) services
+
+						Services are a special kind of program that run in the background. You can list them with the "ps" command:
+						&gt; ps
+						dial.service (running)
+						echo.service (running)
+						vault.service (running)
+
+						Generally, they accept user input, process the input, and return an output. 
+
+						You can interact with services using the netcat (nc) command, which will send data to the provided telco service. If you also provide a telco name, netcat will send your data to the specified service on the provided telco. Here are some examples.
+						
+						Send the data "bar" to the service "foo" on telco5: 
+						&gt; nc foo.service@telco5 bar
+						
+						Send the data "bar" to the service "foo" on the current telco: 
+						&gt; nc foo.service bar
+
+						Everything after the first argument to netcat is considered data:
+						&gt; nc foo.service This entire sentence is considered data.
+
+						Try sending data with netcat to the "echo" service, which will print the supplied data to the console:
+						&gt; nc echo.service hello there
+						hello there
+						-----      END PAGE      -----
+					</inode>
+					<inode name=".trash" type="dir" >
 					</inode>
 				</inode>
 				<inode name="sysadmin" type="dir" permissions="sysadmin:rwx">
-					<inode name=".trash" type="dir" permissions="sysadmin:rwx">
+					<inode name=".trash" type="dir" >
 					</inode>
 				</inode>
 			</inode>

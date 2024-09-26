@@ -4,6 +4,9 @@
 		<user name="dialer" password="buzzard" home="/home/dialer" path="/bin:/home/dialer" />
 	</users>
 	<shell builtins="help;whoami;users;pwd;ls;cd;cat;auth" guest="help;whoami;users;auth"></shell>
+	<services>
+		<service name="dial.service"></service>
+	</services>
 	<filesys>
 		<inode name="" type="dir">
 			<inode name="bin" type="dir" permissions="dialer:r-x">
@@ -80,7 +83,7 @@
 
 					-----  END TRANSMISSION  -----
 				</inode>
-				<inode name="contacts.txt" type="file" properties="encrypted">sysadmin:password123@telco3</inode>
+				<inode name="contacts.txt" type="file" properties="encrypted">telco3:password123@telco3</inode>
 			</inode>
 		</inode>
 	</filesys>

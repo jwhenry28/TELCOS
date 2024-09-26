@@ -3,6 +3,9 @@
 		<user name="user" password="password" home="/home/user" />
 	</users>
 	<shell builtins="help;whoami;users;pwd;ls;cd;cat;auth" guest="help;whoami;users;auth"></shell>
+	<services>
+		<service name="dial.service"></service>
+	</services>
 	<filesys>
 		<inode name="" type="dir">
 			<inode name="home" type="dir">

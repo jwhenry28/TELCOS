@@ -21,6 +21,7 @@ var cmd_prompt_textedit: TextEdit
 var terminal_history_scrollbar: VScrollBar
 var telco_network
 var terminal_noises: Node
+var cursor: Node
 var num_typing_noises: int
 var animation_timing: float
 var animation_label: Label
@@ -40,6 +41,9 @@ func _ready() -> void:
 	terminal_history_scrollbar = $"TerminalHistory".get_v_scroll_bar()
 	telco_network = $"../TelcoNetwork"
 	terminal_noises = $"../SoundPlayer"
+	cursor = $"TerminalHistory/VBoxContainer/HBoxContainer/Cursor"
+
+	cursor.text = ">"
 
 	signal_bus = $"../SignalBus"
 	signal_bus.terminal_stdout.connect(add_to_history)
@@ -49,7 +53,6 @@ func _ready() -> void:
 
 	next_msg_index = vbox_container.get_child_count() - 1
 	print("next_msg_index: ", next_msg_index)
-	connected_telco = "telco1"
 	terminal_state = TerminalState.TYPING
 	msg_buffer = []
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
@@ -113,9 +116,18 @@ func _input(event):
 
 	if Input.is_action_just_released("cmd_enter"): # for whatever reason, Godot renders the cursor in the wrong location if we use just_pressed for enter
 		var cmd = consume_text().strip_edges(true, true)
-		add_to_history("> " + cmd)
+
+		add_to_history(cursor.text + " " + cmd)
 		
 		telco_network.run_cmd(connected_telco, cmd)
+		match telco_network.get_telco(connected_telco).shell.state:
+			0:
+				cursor.text = ">"
+			1: 
+				cursor.text = "telnet>"
+			_:
+				cursor.text = "@"
+		
 		cmd_history_index = telco_network.get_telco(connected_telco).session.user.terminal_history.size()
 
 
