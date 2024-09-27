@@ -25,6 +25,8 @@ var users: UsersDirectory
 var filesys: FileSystem
 var session: Session
 var shell: Shell
+var memory: Memory
+
 var signal_bus: Node
 var telco_state: TelcoState
 var services: Array[Dictionary]
@@ -54,6 +56,7 @@ func initialize_telco(new_telco_name: String) -> void:
 	session = Session.new()
 	shell = Shell.new()
 	users = UsersDirectory.new()
+	memory = Memory.new()
 	signal_bus = get_node("../../SignalBus")
 	signal_bus.network_data.connect(receive_network_data)
 	telco_state = TelcoState.RUNNING
@@ -85,6 +88,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 	
 	var file_path = ''
 	var current_inode = null
+	var current_service = null
 	services = []
 
 	while parser.read() != ERR_FILE_EOF:
@@ -119,7 +123,8 @@ func load_telco_xml(new_telco_name: String) -> void:
 						var service_status = attributes_dict.get('status', "running")
 						var service_visibility = attributes_dict.get('visible', "true")
 						assert(service_name in SERVICES, telco_name + ": service not implemented: " + service_name)
-						services.append({"name": service_name, "visible": service_visibility == "true", "status": service_status})
+						current_service = {"name": service_name, "visible": service_visibility == "true", "status": service_status}
+						services.append(current_service)
 					'filesys':
 						pass
 					'inode':
@@ -366,13 +371,13 @@ func run_cmd(cmd_string: String) -> void:
 
 			stdout(cmd + ": command not found")
 		1: # ShellState.REMOTE
+			send_network_data(telco_name, shell.connected_telco, shell.connected_service + " " + cmd_string)
+			
 			if cmd_string == "exit":
 				shell.state = 0
 				shell.connected_telco = ""
 				shell.connected_service = ""
 				stdout("disconnected")
-			
-			send_network_data(telco_name, shell.connected_telco, shell.connected_service + " " + cmd_string)
 
 
 func run_service_cmd(cmd_string: String, source: String) -> void:
@@ -419,6 +424,7 @@ var BINARIES: Dictionary = {
 var SERVICES: Dictionary = {
 	"dial.service": Cmd.new("dial.service", "Handles incoming calls", dial_service),
 	"echo.service": Cmd.new("echo.service", "Returns inbound messages", echo_service),
+	"daily_msg.service": Cmd.new("daily_msg.service", "Message of the day", daily_msg_service),
 	"vault.service": Cmd.new("vault.service", "???", vault_service),
 }
 
@@ -671,6 +677,8 @@ func telnet_executable(cmd: String, argv: Array) -> bool:
 	shell.connected_telco = dst_telco
 	shell.connected_service = dst_service
 
+	send_network_data(telco_name, dst_telco, dst_service)
+
 	return true
 
 
@@ -700,5 +708,118 @@ func echo_service(_cmd: String, argv: Array, _source: String) -> bool:
 	return true
 
 
-func vault_service(_cmd: String, _argv: Array, _source: String) -> bool:
+func daily_msg_service(_cmd: String, _argv: Array, _source: String) -> bool:
+	return true
+
+
+func vault_service(_cmd: String, argv: Array, _source: String) -> bool:
+	print("vault: received command ", argv)
+	var service_name = "vault.service"
+	var service_data = memory.get_data(service_name, "mem")
+
+	if service_data == null or service_data == {}:
+		print("vault: initializing data")
+		var vault_config = get_inode_from_path("/etc/vault.config")
+		
+		var name_regex = RegEx.new()
+		name_regex.compile("name:.*")
+		var password_regex = RegEx.new()
+		password_regex.compile("password:.*")
+		var data_regex = RegEx.new()
+		data_regex.compile("data:.*")
+		var data_line_regex = RegEx.new()
+		data_line_regex.compile("- \\w*:.*")
+		var processing_data = false
+		var current_data_name = ""
+
+		var vaults = {}
+		var vault_data = {}
+
+		print("vault: processing config")
+
+		for line in vault_config.content.split("\n"):
+			print("vault: line [ " + line + " ]")
+			line = line.strip_edges(true, true)
+			if name_regex.search(line):
+				var vault_name = line.split(':')[1].strip_edges(true, true)
+				print("vault: vault_name: " + vault_name)
+				vault_data["name"] = vault_name
+			elif password_regex.search(line):
+				var password = line.split(':')[1].strip_edges(true, true)
+				vault_data["password"] = password
+			elif data_regex.search(line):
+				processing_data = true
+				vault_data["data"] = {}
+			elif line.strip_edges(true, true) == "":
+				vaults[vault_data["name"]] = vault_data
+				processing_data = false
+				vault_data = {}
+			elif processing_data:
+				if data_line_regex.search(line):
+					current_data_name = line.split(':')[0].replace("- ", "")
+					vault_data["data"][current_data_name] = line.split(':')[1].strip_edges(true, true)
+				else:
+					vault_data["data"][current_data_name] += "\n" + line.strip_edges(true, true)
+
+		if vault_data != {}:
+			vaults[vault_data["name"]] = vault_data
+			processing_data = false
+			vault_data = {}
+
+		service_data = {"state": "init", "vaults": vaults}
+		print("vault data: ", service_data)
+		memory.store_data(service_name, "mem", service_data)
+	
+	if argv.size() > 0 and argv[0] == "exit":
+		service_data["state"] = "init"
+	else:
+		match service_data["state"]:
+			"init":
+				service_data["state"] = "connected"
+			"connected":
+				stdout("AVAILABLE VAULTS:")
+				for vault_name in service_data["vaults"].keys():
+					stdout("- " + vault_name)
+				stdout("ENTER VAULT NAME: ")
+				service_data["state"] = "awaiting"
+			"awaiting":
+				var vault_name = argv[0]
+				var vault = service_data["vaults"].get(vault_name)
+				if vault == null:
+					stdout("NO SUCH VAULT")
+				else:
+					stdout("ENTER PASSWORD: ")
+					service_data["current_vault"] = vault_name
+					service_data["state"] = "authenticating"
+			"authenticating":
+				var current_vault = service_data["current_vault"]
+				var password = argv[0]
+				if service_data["vaults"][current_vault]["password"] == password:
+					stdout("ACCESS GRANTED. SELECT DATA TO VIEW:")
+					for data_name in service_data["vaults"][current_vault]["data"].keys():
+						stdout(data_name)
+					service_data["state"] = "selecting"
+				else:
+					stderr("ACCESS DENIED")
+					stdout("ENTER VAULT NAME: ")
+					service_data["state"] = "awaiting"
+			"selecting":
+				var current_vault = service_data["current_vault"]
+				var selected_data_name = argv[0]
+
+				var selected_data = service_data["vaults"][current_vault]["data"].get(selected_data_name)
+				if selected_data == null:
+					stdout("NO SUCH DATA IN VAULT '" + current_vault + "'")
+					stdout("SELECT DATA TO VIEW:")
+					for data_name in service_data["vaults"][current_vault]["data"].keys():
+						stdout(data_name)
+				else:
+					stdout(selected_data_name + ":")
+					stdout(selected_data)
+					stdout("\nSELECT DATA TO VIEW:")
+					for data_name in service_data["vaults"][current_vault]["data"].keys():
+						stdout(data_name)
+	
+	memory.store_data(service_name, "mem", service_data)
+
 	return true
