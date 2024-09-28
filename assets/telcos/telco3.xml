@@ -29,8 +29,8 @@
 				</inode>
 			</inode>
 			<inode name="bin" type="dir" permissions="*:r-x">
-				<inode name="telnet" type="executable">
-					telnet_standard
+				<inode name="nc" type="executable">
+					nc_standard
 				</inode>
 			</inode>
 			<inode name="home" type="dir">

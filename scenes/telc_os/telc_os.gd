@@ -91,6 +91,8 @@ func load_telco_xml(new_telco_name: String) -> void:
 	var current_service = null
 	services = []
 
+	var parsing_stage = "telco"
+
 	while parser.read() != ERR_FILE_EOF:
 		match parser.get_node_type():
 			XMLParser.NODE_ELEMENT:
@@ -103,7 +105,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 					'telco':
 						self.telco_name = attributes_dict['name']
 					'users':
-						pass
+						parsing_stage = "users"
 					'user':
 						var username = attributes_dict.get('name', '')
 						var password = attributes_dict.get('password', '')
@@ -117,16 +119,15 @@ func load_telco_xml(new_telco_name: String) -> void:
 						shell.assign_builtin_cmds(builtins)
 						shell.assign_guest_cmds(guest)
 					'services':
-						pass
+						parsing_stage = "services"
 					'service':
 						var service_name = attributes_dict.get('name')
 						var service_status = attributes_dict.get('status', "running")
 						var service_visibility = attributes_dict.get('visible', "true")
 						assert(service_name in SERVICES, telco_name + ": service not implemented: " + service_name)
 						current_service = {"name": service_name, "visible": service_visibility == "true", "status": service_status}
-						services.append(current_service)
 					'filesys':
-						pass
+						parsing_stage = "filesys"
 					'inode':
 						var file_name = attributes_dict.get('name')
 						var file_type = attributes_dict.get('type')
@@ -183,12 +184,14 @@ func load_telco_xml(new_telco_name: String) -> void:
 							current_inode = new_inode
 			
 			XMLParser.NODE_TEXT:
-				var content = parser.get_node_data().strip_edges(true, true)
-				if content != '':
-					if current_inode.type == "executable":
-						assert(BINARIES.has(content) or SERVICES.has(content), "(" + telco_name + ") o implementation for executable: " + content)
+				match parsing_stage:
+					'filesys':
+						var content = parser.get_node_data().strip_edges(true, true)
+						if content != '':
+							if current_inode.type == "executable":
+								assert(BINARIES.has(content) or SERVICES.has(content), "(" + telco_name + ") o implementation for executable: " + content)
 
-					current_inode.set_content(content)
+							current_inode.set_content(content)
 			XMLParser.NODE_ELEMENT_END:
 				var element_name = parser.get_node_name()
 				match element_name:
@@ -196,6 +199,9 @@ func load_telco_xml(new_telco_name: String) -> void:
 						var parent_path_array:PackedStringArray = file_path.split('/')
 						parent_path_array.remove_at(parent_path_array.size() - 1)
 						file_path = "/".join(parent_path_array)
+					'service':
+						services.append(current_service)
+
 
 	users.register_user("guest", "", "", "")
 	initialize_session("guest")
@@ -418,7 +424,7 @@ var BINARIES: Dictionary = {
 	"ps": Cmd.new("ps", "Displays all running services", ps_cmd),
 	"dial_standard": Cmd.new("dial", "Dial a new telco", dial_executable),
 	"decryptor_standard": Cmd.new("decryptor", "Decrypts a file", decryptor_executable),
-	"telnet_standard": Cmd.new("telnet", "Sends network data to a provided telco service", telnet_executable),
+	"nc_standard": Cmd.new("nc", "Sends network data to a provided telco service", nc_executable),
 }
 
 var SERVICES: Dictionary = {
@@ -654,7 +660,7 @@ func decryptor_executable(cmd: String, argv: Array) -> bool:
 	return true
 
 
-func telnet_executable(cmd: String, argv: Array) -> bool:
+func nc_executable(cmd: String, argv: Array) -> bool:
 	if argv.size() < 1:
 		stdout("(usage) " + cmd + " <service_name>[@<telco_name>]")
 		return false

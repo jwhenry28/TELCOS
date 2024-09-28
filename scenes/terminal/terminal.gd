@@ -43,7 +43,8 @@ func _ready() -> void:
 	terminal_noises = $"../SoundPlayer"
 	cursor = $"TerminalHistory/VBoxContainer/HBoxContainer/Cursor"
 
-	cursor.text = ">"
+	cursor.text = "> "
+	cmd_prompt_textedit.placeholder_text = "..."
 
 	signal_bus = $"../SignalBus"
 	signal_bus.terminal_stdout.connect(add_to_history)
@@ -117,14 +118,16 @@ func _input(event):
 	if Input.is_action_just_released("cmd_enter"): # for whatever reason, Godot renders the cursor in the wrong location if we use just_pressed for enter
 		var cmd = consume_text().strip_edges(true, true)
 
-		add_to_history(cursor.text + " " + cmd)
+		add_to_history(cursor.text + cmd)
 		
 		telco_network.run_cmd(connected_telco, cmd)
 		match telco_network.get_telco(connected_telco).shell.state:
-			0:
-				cursor.text = ">"
-			1: 
-				cursor.text = "telnet>"
+			0: # LOCAL
+				cursor.text = "> "
+				cmd_prompt_textedit.placeholder_text = "..."
+			1: # REMOTE
+				cursor.text = ""
+				cmd_prompt_textedit.placeholder_text = ""
 			_:
 				cursor.text = "@"
 		
@@ -144,7 +147,7 @@ func adjust_scrollbar() -> void:
 
 
 func add_to_history(text: String, is_stderr: bool = false) -> void:
-	print("adding to history: ", text)
+	print("adding to history: [", text + "]")
 	print("terminal state: ", TerminalState.keys()[terminal_state])
 	if terminal_state == TerminalState.TYPING or terminal_state == TerminalState.INACTIVE:
 		var label = Label.new()
