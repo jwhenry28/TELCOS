@@ -1,13 +1,6 @@
 class_name TelcOS extends Node
 
 
-enum TelcoState {
-	RUNNING,
-	DIALING,
-	DISCONNECTED
-}
-
-
 class Cmd:
 	var name: String
 	var help: String
@@ -19,6 +12,17 @@ class Cmd:
 		self.callback = new_callback
 
 
+class Svc:
+	var name: String
+	var callback: Callable
+	var process: Callable
+
+	func _init(new_name: String, new_callback: Callable, new_process: Callable):
+		self.name = new_name
+		self.callback = new_callback
+		self.process = new_process
+
+
 var telco_network
 var telco_name: String
 var users: UsersDirectory
@@ -28,8 +32,14 @@ var shell: Shell
 var memory: Memory
 
 var signal_bus: Node
-var telco_state: TelcoState
-var services: Array[Dictionary]
+var installed_services: Array[Dictionary]
+
+
+func _init() -> void:
+	session = Session.new()
+	shell = Shell.new()
+	users = UsersDirectory.new()
+	memory = Memory.new()
 
 
 # Called when the node enters the scene tree for the first time.
@@ -41,25 +51,17 @@ func _ready() -> void:
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(_delta: float) -> void:
-	match telco_state:
-		TelcoState.DIALING:
-			pass
-		TelcoState.RUNNING:
-			pass
-		TelcoState.DISCONNECTED:
-			pass
-
+func _process(delta: float) -> void:
+	for service in installed_services:
+		var svc = SERVICES.get(service["name"])
+		if svc != null:
+			svc.process.call(delta)
+	
 
 func initialize_telco(new_telco_name: String) -> void:
 	telco_name = new_telco_name
-	session = Session.new()
-	shell = Shell.new()
-	users = UsersDirectory.new()
-	memory = Memory.new()
 	signal_bus = get_node("../../SignalBus")
 	signal_bus.network_data.connect(receive_network_data)
-	telco_state = TelcoState.RUNNING
 
 	load_telco_xml(telco_name)
 
@@ -89,7 +91,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 	var file_path = ''
 	var current_inode = null
 	var current_service = null
-	services = []
+	installed_services = []
 
 	var parsing_stage = "telco"
 
@@ -200,7 +202,7 @@ func load_telco_xml(new_telco_name: String) -> void:
 						parent_path_array.remove_at(parent_path_array.size() - 1)
 						file_path = "/".join(parent_path_array)
 					'service':
-						services.append(current_service)
+						installed_services.append(current_service)
 
 
 	users.register_user("guest", "", "", "")
@@ -318,6 +320,7 @@ func get_user_commands(username: String) -> Array[String]:
 
 
 func stdout(msg: String) -> void:
+	print(telco_name + ": stdout")
 	signal_bus.terminal_stdout.emit(msg)
 
 
@@ -391,7 +394,7 @@ func run_service_cmd(cmd_string: String, source: String) -> void:
 	var cmd = cmd_args[0]
 	var argv = cmd_args.slice(1)
 
-	for service in services:
+	for service in installed_services:
 		if service["name"] == cmd and SERVICES.has(cmd):
 			match service["status"]:
 				"running":
@@ -403,7 +406,7 @@ func run_service_cmd(cmd_string: String, source: String) -> void:
 
 
 func service_exists(service_name, status="") -> bool:
-	for service in services:
+	for service in installed_services:
 		if service["name"] == service_name:
 			if status != "":
 				return service["status"] == status
@@ -428,10 +431,10 @@ var BINARIES: Dictionary = {
 }
 
 var SERVICES: Dictionary = {
-	"dial.service": Cmd.new("dial.service", "Handles incoming calls", dial_service),
-	"echo.service": Cmd.new("echo.service", "Returns inbound messages", echo_service),
-	"daily_msg.service": Cmd.new("daily_msg.service", "Message of the day", daily_msg_service),
-	"vault.service": Cmd.new("vault.service", "???", vault_service),
+	"dial.service": Svc.new("dial.service", dial_service_callback, empty_service_process),
+	"echo.service": Svc.new("echo.service", echo_service_callback, empty_service_process),
+	"daily_msg.service": Svc.new("daily_msg.service", daily_msg_service_callback, empty_service_process),
+	"vault.service": Svc.new("vault.service", vault_service_callback, empty_service_process),
 }
 
 func help_cmd(_cmd: String, _argv: Array) -> bool:
@@ -598,7 +601,7 @@ func auth_cmd(cmd: String, argv: Array) -> bool:
 
 func ps_cmd(_cmd: String, _argv: Array) -> bool:
 	var msg = ""
-	for service in services:
+	for service in installed_services:
 		if service["visible"]:
 			msg += SERVICES[service["name"]].name + " (" + service["status"] + ")" + "\n"
 
@@ -688,7 +691,15 @@ func nc_executable(cmd: String, argv: Array) -> bool:
 	return true
 
 
-func dial_service(_cmd: String, argv: Array, _source: String) -> bool:
+func empty_service_process(_delta: float) -> void:
+	return
+
+
+func empty_service_callback(_cmd: String, _argv: Array, _source: String) -> bool:
+	return true
+
+
+func dial_service_callback(_cmd: String, argv: Array, _source: String) -> bool:
 	var auth_string = argv[0]
 	var username = auth_string.split(":")[0]
 	var tmp = auth_string.split(":")[1]
@@ -707,18 +718,33 @@ func dial_service(_cmd: String, argv: Array, _source: String) -> bool:
 		return false
 
 
-func echo_service(_cmd: String, argv: Array, _source: String) -> bool:
+func echo_service_callback(_cmd: String, argv: Array, _source: String) -> bool:
 	print("received echo data: ", argv)
 	var msg = " ".join(argv)
 	stdout(msg)
 	return true
 
 
-func daily_msg_service(_cmd: String, _argv: Array, _source: String) -> bool:
+func daily_msg_service_callback(_cmd: String, argv: Array, _source: String) -> bool:
+	var service_name = "daily_msg.service"
+	var service_data = memory.get_data(service_name, "mem")
+
+	if argv.size() > 0 and argv[0] == "exit":
+		return true
+
+	if service_data == null or service_data == {}:
+		var dm_config = get_inode_from_path("/etc/daily_msg.config")
+		service_data = {"msgs": dm_config.content.split("\n")}
+		memory.store_data(service_name, "mem", service_data)
+	
+	var idx = 0
+	var msg = service_data["msgs"][idx]
+	stdout(msg)
+
 	return true
 
 
-func vault_service(_cmd: String, argv: Array, _source: String) -> bool:
+func vault_service_callback(_cmd: String, argv: Array, _source: String) -> bool:
 	print("vault: received command ", argv)
 	var service_name = "vault.service"
 	var service_data = memory.get_data(service_name, "mem")
@@ -739,7 +765,7 @@ func vault_service(_cmd: String, argv: Array, _source: String) -> bool:
 		var current_data_name = ""
 
 		var vaults = {}
-		var vault_data = {}
+		var vault_data = {"name": "", "password": "", "data": {}}
 
 		print("vault: processing config")
 
@@ -773,7 +799,6 @@ func vault_service(_cmd: String, argv: Array, _source: String) -> bool:
 			vault_data = {}
 
 		service_data = {"state": "init", "vaults": vaults}
-		print("vault data: ", service_data)
 		memory.store_data(service_name, "mem", service_data)
 	
 	if argv.size() > 0 and argv[0] == "exit":
@@ -785,7 +810,7 @@ func vault_service(_cmd: String, argv: Array, _source: String) -> bool:
 			"connected":
 				stdout("AVAILABLE VAULTS:")
 				for vault_name in service_data["vaults"].keys():
-					stdout("- " + vault_name)
+					stdout(vault_name)
 				stdout("ENTER VAULT NAME: ")
 				service_data["state"] = "awaiting"
 			"awaiting":
@@ -793,10 +818,16 @@ func vault_service(_cmd: String, argv: Array, _source: String) -> bool:
 				var vault = service_data["vaults"].get(vault_name)
 				if vault == null:
 					stdout("NO SUCH VAULT")
-				else:
+				elif vault["password"] != "":
 					stdout("ENTER PASSWORD: ")
 					service_data["current_vault"] = vault_name
 					service_data["state"] = "authenticating"
+				else:
+					stdout("ACCESS GRANTED. SELECT DATA TO VIEW:")
+					service_data["current_vault"] = vault_name
+					for data_name in vault["data"].keys():
+						stdout(data_name)
+					service_data["state"] = "selecting"
 			"authenticating":
 				var current_vault = service_data["current_vault"]
 				var password = argv[0]
@@ -829,3 +860,19 @@ func vault_service(_cmd: String, argv: Array, _source: String) -> bool:
 	memory.store_data(service_name, "mem", service_data)
 
 	return true
+
+
+# keeping as an example
+func vault_service_process(delta: float):
+	var service_name = "vault.service"
+	var process_timer = memory.get_data(service_name, "process_timer")
+
+	if process_timer != null:
+		process_timer += delta
+
+		if process_timer > 5.0:
+			process_timer = 0.0
+			stdout("vault.service: ping")
+	else:
+		process_timer = 0.0
+	memory.store_data(service_name, "process_timer", process_timer)

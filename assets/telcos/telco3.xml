@@ -15,17 +15,19 @@
 			<inode name="etc" type="dir" permissions="*:r-x">
 				<inode name="vault.config" type="file" permissions="*:---">
 					name: server
-					password: empire
 					data:
 					- NAME: TELCO3
 					- SPECS: TELNIX v14.3, 16b, 1993
 					- USERS: 2/10
 					- FILESYSTEM: 1651B used, 30349B remaining 
 
-					name: jason
+					name: sysadmin
 					password: monkey
 					data:
 					- sysadmin_pswd: power
+				</inode>
+				<inode name="daily_msg.config" type="file" permissions="*:---">
+					the password for the sysadmin vault is "monkey"
 				</inode>
 			</inode>
 			<inode name="bin" type="dir" permissions="*:r-x">
