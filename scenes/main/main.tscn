@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://dabc33oxpynev"]
+[gd_scene load_steps=14 format=3 uid="uid://dabc33oxpynev"]
 
 [ext_resource type="Script" path="res://scenes/main/main.gd" id="1_8xtc6"]
 [ext_resource type="FontFile" uid="uid://bgadrxg0ccdgb" path="res://fonts/SFMonoRegular.otf" id="1_wqm58"]
@@ -12,6 +12,7 @@
 [ext_resource type="Script" path="res://scenes/main/signal_bus.gd" id="7_7iogf"]
 [ext_resource type="AudioStream" uid="uid://5dxbn8v7fqnb" path="res://assets/sounds/dial.mp3" id="7_qlhlb"]
 [ext_resource type="AudioStream" uid="uid://brxpld4vm4y3g" path="res://assets/sounds/error2.wav" id="8_icns6"]
+[ext_resource type="PackedScene" uid="uid://crqk6leymugtr" path="res://scenes/stats/stats.tscn" id="12_oglw2"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_8xtc6")
@@ -62,10 +63,6 @@ horizontal_alignment = 1
 
 [node name="Comms" parent="." instance=ExtResource("6_77t78")]
 
-[node name="Stats" type="Panel" parent="."]
-offset_left = 640.0
-offset_top = 305.0
-offset_right = 1124.0
-offset_bottom = 548.0
+[node name="Stats" parent="." instance=ExtResource("12_oglw2")]
 
 [node name="TelcoNetwork" parent="." instance=ExtResource("6_klq8m")]

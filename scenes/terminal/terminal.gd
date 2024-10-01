@@ -157,12 +157,6 @@ func add_to_history(text: String, is_stderr: bool = false) -> void:
 		label.add_theme_color_override("font_color", TERMINAL_GREEN)
 		label.add_theme_font_size_override("font_size", FONT_SIZE)
 
-		
-		print("next_msg_index: ", next_msg_index)
-		# var last_sibling = vbox_container.get_child(next_msg_index)
-		# print("adding sibling to: ", last_sibling.name)
-		# next_msg_index += 1
-		# last_sibling.add_sibling(label)
 		vbox_container.add_child(label)
 		vbox_container.move_child(label, next_msg_index)
 		next_msg_index += 1

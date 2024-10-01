@@ -596,6 +596,7 @@ func auth_cmd(cmd: String, argv: Array) -> bool:
 	
 	initialize_session(username)
 	stdout("welcome, " + session.get_username()+ "!")
+	signal_bus.stats_add.emit("credentials", username)
 	return true
 
 
