@@ -31,6 +31,8 @@ var session: Session
 var shell: Shell
 var memory: Memory
 
+var stats: Dictionary
+
 var signal_bus: Node
 var installed_services: Array[Dictionary]
 
@@ -40,6 +42,8 @@ func _init() -> void:
 	shell = Shell.new()
 	users = UsersDirectory.new()
 	memory = Memory.new()
+	
+	stats = {"credentials": [], "files": [], "services": []}
 
 
 # Called when the node enters the scene tree for the first time.
@@ -328,6 +332,12 @@ func stderr(msg: String) -> void:
 	signal_bus.terminal_stderr.emit(msg)
 
 
+func add_stats(type: String, value: String) -> void:
+	signal_bus.stats_add.emit(type, value)
+	if stats[type].find(value) == -1:
+		stats[type].append(value)
+
+
 func send_network_data(source: String, destination: String, data: String) -> void:
 	signal_bus.network_data.emit(source, destination, data)
 
@@ -398,6 +408,7 @@ func run_service_cmd(cmd_string: String, source: String) -> void:
 		if service["name"] == cmd and SERVICES.has(cmd):
 			match service["status"]:
 				"running":
+					add_stats("services", cmd)
 					SERVICES[cmd].callback.call(cmd, argv, source)
 				"stopped":
 					stderr("(" + cmd + " not running on " + telco_name + ")")
@@ -571,6 +582,7 @@ func cat_cmd(cmd: String, argv: Array) -> bool:
 
 	if target_inode.type == "file":
 		stdout(target_inode.get_content())
+		add_stats("files", absolute_path)
 		return true
 	else:
 		stdout("not a file")
@@ -596,7 +608,7 @@ func auth_cmd(cmd: String, argv: Array) -> bool:
 	
 	initialize_session(username)
 	stdout("welcome, " + session.get_username()+ "!")
-	signal_bus.stats_add.emit("credentials", username)
+	add_stats("credentials", username)
 	return true
 
 
@@ -710,6 +722,7 @@ func dial_service_callback(_cmd: String, argv: Array, _source: String) -> bool:
 	print("dial.service: authenticating " + username)
 
 	if authenticate_user(username, password):
+		add_stats("credentials", username)
 		signal_bus.terminal_change_telco.emit(auth_telco_name, username)
 		initialize_session(username)
 		stdout("WELCOME TO " + auth_telco_name.to_upper() + ". TYPE 'HELP' TO BEGIN:")

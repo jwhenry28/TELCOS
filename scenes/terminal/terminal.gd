@@ -184,9 +184,6 @@ func _on_change_telco(new_telco_name: String, username: String) -> void:
 	print("terminal: changing telco to ", username, "@", new_telco_name)
 	connected_telco = new_telco_name
 
-	# var telcOS = telco_network.get_telco(connected_telco)
-	# telcOS.initialize_session(username)
-
 
 func _on_terminal_state_change(state: String) -> void:
 	terminal_state = TerminalState.get(state)
