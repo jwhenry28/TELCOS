@@ -26,6 +26,7 @@ var num_typing_noises: int
 var animation_timing: float
 var animation_label: Label
 var msg_buffer: Array[Dictionary]
+var received_state_change: bool
 
 var signal_bus
 
@@ -81,6 +82,8 @@ func _process(delta: float) -> void:
 			animation_label.text = dialing_msg
 
 			if animation_timing > DIAL_DURATION:
+				if !received_state_change:
+					add_to_history("no answer", true)
 				print("exceeded duration")
 				_on_terminal_state_change("TYPING")
 		TerminalState.INACTIVE:
@@ -183,6 +186,7 @@ func _on_stderr(msg: String) -> void:
 func _on_change_telco(new_telco_name: String, username: String) -> void:
 	print("terminal: changing telco to ", username, "@", new_telco_name)
 	connected_telco = new_telco_name
+	received_state_change = true
 
 
 func _on_terminal_state_change(state: String) -> void:
@@ -197,6 +201,7 @@ func _on_terminal_state_change(state: String) -> void:
 				var msg = msg_buffer.pop_front()
 				add_to_history(msg.text, msg.is_stderr)
 		TerminalState.DIALING:
+			received_state_change = false
 			animation_timing = 0.0
 			print("animation_label: ", vbox_container.get_child(next_msg_index-1).name)
 			animation_label = vbox_container.get_child(next_msg_index-1)

@@ -11,12 +11,32 @@ var title: Label
 
 var signal_bus
 
+
+func recursive_find_node(current_node: Node, node_name: String) -> Node:
+	var node = current_node.get_node(node_name)
+	
+	# Base case: current node is a match
+	if node != null and node.name == node_name:
+		print("returning: " + node.name)
+		return node
+	
+	# Otherwise, check children
+	for child in current_node.get_children():
+		node = recursive_find_node(child, node_name)
+		if node != null:
+			print("found child: " + node.name)
+			return node
+	
+	return null
+	
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	title = $"Label"
-	credentials = $"CredentialsContainer/ScrollContainer/VBoxContainer"
-	files = $"FilesContainer/ScrollContainer/VBoxContainer"
-	services = $"ServicesContainer/ScrollContainer/VBoxContainer"
+	var vbox_path = "ScrollContainer/VBoxContainer"
+	credentials = recursive_find_node(self, "CredentialsContainer").get_node(vbox_path)
+	files = recursive_find_node(self, "FilesContainer").get_node(vbox_path)
+	services = recursive_find_node(self, "ServicesContainer").get_node(vbox_path)
 
 	signal_bus = $"../SignalBus"
 	signal_bus.stats_add.connect(_on_stats_add)
@@ -72,7 +92,7 @@ func _on_stats_add(stat_name: String, value: String):
 	var label = Label.new()
 	label.name = node_name
 	label.text = value
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	label.add_theme_color_override("font_color", TERMINAL_GREEN)
 	label.add_theme_font_size_override("font_size", FONT_SIZE)
 

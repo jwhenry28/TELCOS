@@ -26,7 +26,7 @@ func _ready() -> void:
 				print("telco added")
 			file_name = dir.get_next()
 	
-	$"../Terminal".terminal_dial("telco1", "guest", "")
+	$"../Terminal".terminal_dial("telco2", "telco2", "fuzzing")
 
 
 func get_telco(telco_name: String):

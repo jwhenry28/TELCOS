@@ -1,93 +1,157 @@
-[gd_scene load_steps=3 format=3 uid="uid://crqk6leymugtr"]
+[gd_scene load_steps=4 format=3 uid="uid://crqk6leymugtr"]
 
 [ext_resource type="Script" path="res://scenes/stats/stats.gd" id="1_ii11t"]
-[ext_resource type="Theme" uid="uid://d2b2dbm31ohsc" path="res://themes/telcos.tres" id="2_57rkm"]
+[ext_resource type="Theme" uid="uid://d2b2dbm31ohsc" path="res://themes/telcos_defaults.tres" id="2_57rkm"]
+[ext_resource type="Theme" uid="uid://c6l6deqyuvhlb" path="res://themes/stats_box.tres" id="3_gowiu"]
 
 [node name="Stats" type="Panel"]
 offset_left = 640.0
 offset_top = 305.0
 offset_right = 1124.0
-offset_bottom = 548.0
+offset_bottom = 581.0
 script = ExtResource("1_ii11t")
 
 [node name="Label" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -20.0
-offset_right = 20.0
+layout_mode = 2
+offset_right = 484.0
 offset_bottom = 15.0
 grow_horizontal = 2
 theme = ExtResource("2_57rkm")
 text = "CURRENT_TELCO"
+horizontal_alignment = 1
 
-[node name="CredentialsContainer" type="Control" parent="."]
-anchors_preset = 0
-offset_left = 16.0
+[node name="StatsVBoxOuter" type="VBoxContainer" parent="."]
+layout_mode = 0
 offset_top = 16.0
-offset_right = 156.0
-offset_bottom = 227.0
+offset_right = 484.0
+offset_bottom = 276.0
+theme_override_constants/separation = 0
 
-[node name="Label" type="Label" parent="CredentialsContainer"]
+[node name="HSeparator" type="HSeparator" parent="StatsVBoxOuter"]
+layout_mode = 2
+theme = ExtResource("3_gowiu")
+
+[node name="StatsHBoxInner" type="HBoxContainer" parent="StatsVBoxOuter"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 100.0
+theme_override_constants/separation = 0
+
+[node name="CredsServsVBox" type="VBoxContainer" parent="StatsVBoxOuter/StatsHBoxInner"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="CredsHBox" type="HBoxContainer" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 100.0
+
+[node name="Spacing" type="Control" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/CredsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 8.0
+
+[node name="CredentialsContainer" type="Control" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/CredsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+size_flags_stretch_ratio = 232.0
+
+[node name="Label" type="Label" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/CredsHBox/CredentialsContainer"]
 layout_mode = 1
 offset_right = 82.0
 offset_bottom = 15.0
-text = "CREDENTIALS"
+text = "DISCOVERED CREDENTIALS"
 
-[node name="ScrollContainer" type="ScrollContainer" parent="CredentialsContainer"]
+[node name="ScrollContainer" type="ScrollContainer" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/CredsHBox/CredentialsContainer"]
 layout_mode = 0
 offset_top = 16.0
-offset_right = 140.0
-offset_bottom = 211.0
+offset_right = 218.0
+offset_bottom = 105.0
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CredentialsContainer/ScrollContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/CredsHBox/CredentialsContainer/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="FilesContainer" type="Control" parent="."]
-anchors_preset = 0
-offset_left = 174.0
-offset_top = 16.0
-offset_right = 314.0
-offset_bottom = 227.0
+[node name="HSeparator" type="HSeparator" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme = ExtResource("3_gowiu")
 
-[node name="Label" type="Label" parent="FilesContainer"]
+[node name="ServsHBox" type="HBoxContainer" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 100.0
+
+[node name="Spacing" type="Control" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/ServsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 8.0
+
+[node name="ServicesContainer" type="Control" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/ServsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+size_flags_stretch_ratio = 232.0
+
+[node name="Label" type="Label" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/ServsHBox/ServicesContainer"]
 layout_mode = 1
 offset_right = 82.0
 offset_bottom = 15.0
-text = "FILES
+text = "KNOWN SERVICES
 "
 
-[node name="ScrollContainer" type="ScrollContainer" parent="FilesContainer"]
+[node name="ScrollContainer" type="ScrollContainer" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/ServsHBox/ServicesContainer"]
 layout_mode = 0
 offset_top = 16.0
-offset_right = 140.0
-offset_bottom = 211.0
+offset_right = 218.0
+offset_bottom = 105.0
 
-[node name="VBoxContainer" type="VBoxContainer" parent="FilesContainer/ScrollContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="StatsVBoxOuter/StatsHBoxInner/CredsServsVBox/ServsHBox/ServicesContainer/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="ServicesContainer" type="Control" parent="."]
-anchors_preset = 0
-offset_left = 328.0
-offset_top = 16.0
-offset_right = 468.0
-offset_bottom = 227.0
+[node name="FilesHBoxOuter" type="HBoxContainer" parent="StatsVBoxOuter/StatsHBoxInner"]
+layout_mode = 2
+size_flags_horizontal = 3
 
-[node name="Label" type="Label" parent="ServicesContainer"]
+[node name="VSeparator" type="VSeparator" parent="StatsVBoxOuter/StatsHBoxInner/FilesHBoxOuter"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme = ExtResource("3_gowiu")
+
+[node name="FilesHBox" type="HBoxContainer" parent="StatsVBoxOuter/StatsHBoxInner/FilesHBoxOuter"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 100.0
+
+[node name="Control" type="Control" parent="StatsVBoxOuter/StatsHBoxInner/FilesHBoxOuter/FilesHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 6.0
+
+[node name="FilesContainer" type="Control" parent="StatsVBoxOuter/StatsHBoxInner/FilesHBoxOuter/FilesHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 234.0
+theme = ExtResource("3_gowiu")
+
+[node name="Label" type="Label" parent="StatsVBoxOuter/StatsHBoxInner/FilesHBoxOuter/FilesHBox/FilesContainer"]
 layout_mode = 1
 offset_right = 82.0
 offset_bottom = 15.0
-text = "SERVICES"
+text = "EXFILTRATED FILES"
 
-[node name="ScrollContainer" type="ScrollContainer" parent="ServicesContainer"]
+[node name="ScrollContainer" type="ScrollContainer" parent="StatsVBoxOuter/StatsHBoxInner/FilesHBoxOuter/FilesHBox/FilesContainer"]
 layout_mode = 0
 offset_top = 16.0
-offset_right = 140.0
+offset_right = 218.0
 offset_bottom = 211.0
+focus_mode = 1
+horizontal_scroll_mode = 3
+vertical_scroll_mode = 3
 
-[node name="VBoxContainer" type="VBoxContainer" parent="ServicesContainer/ScrollContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="StatsVBoxOuter/StatsHBoxInner/FilesHBoxOuter/FilesHBox/FilesContainer/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3

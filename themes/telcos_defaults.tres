@@ -1,6 +1,6 @@
 [gd_resource type="Theme" load_steps=4 format=3 uid="uid://d2b2dbm31ohsc"]
 
-[ext_resource type="FontFile" uid="uid://bgadrxg0ccdgb" path="res://fonts/SFMonoRegular.otf" id="1_y5v3v"]
+[ext_resource type="FontFile" uid="uid://bgadrxg0ccdgb" path="res://fonts/SFMonoRegular.otf" id="1_fkvhf"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_uewnl"]
 bg_color = Color(0.223529, 1, 0.0784314, 0.196078)
@@ -18,7 +18,7 @@ corner_radius_bottom_left = 8
 border_width_top = 12
 
 [resource]
-default_font = ExtResource("1_y5v3v")
+default_font = ExtResource("1_fkvhf")
 HBoxContainer/constants/separation = 0
 Label/colors/font_color = Color(0.223529, 1, 0.0784314, 1)
 Label/font_sizes/font_size = 12
