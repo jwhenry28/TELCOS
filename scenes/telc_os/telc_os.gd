@@ -833,7 +833,7 @@ func vault_service_callback(_cmd: String, argv: Array, _source: String) -> bool:
 				stdout("\nAVAILABLE VAULTS:")
 				for vault_name in service_data["vaults"].keys():
 					stdout(vault_name)
-				stdout("\nSELECT VAULT: ")
+				stdout("\nSELECT VAULT: ", "")
 				service_data["state"] = "awaiting"
 			"awaiting":
 				var vault_name = argv[0]

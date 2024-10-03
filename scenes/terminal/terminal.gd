@@ -152,17 +152,20 @@ func adjust_scrollbar() -> void:
 
 
 func add_to_history(text: String, is_stderr: bool = false, buffer_override = false) -> void:
-	print("terminal: adding to history: [", text + "]")
-	print("terminal: terminal state: ", TerminalState.keys()[terminal_state])
+	print("terminal: adding to history: [", text.replace("\n", "\\n") + "]")
 	if terminal_state == TerminalState.TYPING or terminal_state == TerminalState.INACTIVE or buffer_override:
 		for char in text:
 			if char == "\n" or vbox_container.get_child_count() == 1:
+				print("terminal: creating new label")
 				var label = Label.new()
 				label.text = ""
 				label.visible = false
 				label.autowrap_mode = TextServer.AUTOWRAP_WORD
 				label.add_theme_color_override("font_color", TERMINAL_GREEN)
 				label.add_theme_font_size_override("font_size", FONT_SIZE)
+				
+				var previous_label = vbox_container.get_child(next_msg_index - 1)
+				previous_label.visible = true
 
 				vbox_container.add_child(label)
 				vbox_container.move_child(label, next_msg_index)
@@ -172,31 +175,15 @@ func add_to_history(text: String, is_stderr: bool = false, buffer_override = fal
 				var current_label = vbox_container.get_child(next_msg_index - 1)
 				current_label.visible = true
 				current_label.text += char
-				
-		#if text.find("\n") == -1 and vbox_container.get_children().size() > 1:
-			#var last_item = vbox_container.get_child(next_msg_index - 2)
-			#print("terminal: last_item: " + last_item.name)
-			#last_item.text += text
-		#else:
-			#for chunk in text.split("\n", true, max(1, text.count("\n"))):
-				#print("terminal: chunk " + chunk)
-				#var label = Label.new()
-				#label.name = str(next_msg_index) + " " + chunk
-				#label.text = chunk
-				#label.autowrap_mode = TextServer.AUTOWRAP_WORD
-				#label.add_theme_color_override("font_color", TERMINAL_GREEN)
-				#label.add_theme_font_size_override("font_size", FONT_SIZE)
-#
-				#vbox_container.add_child(label)
-				#vbox_container.move_child(label, next_msg_index)
-				#next_msg_index += 1
 
 		if is_stderr:
 			terminal_noises.get_node("stderr").play()
 	else:
 		var msg = {"text": text, "is_stderr": is_stderr}
-		print("terminal: adding to buffer: ", msg)
+		print("terminal: adding to buffer.")
 		msg_buffer.append(msg)
+	
+	print("terminal: message logged.")
 
 
 func terminal_dial(telco_name: String, username: String = "guest", password: String = "") -> void:
