@@ -23,6 +23,8 @@ class Svc:
 		self.process = new_process
 
 
+const TERMINAL_STRING = "user_terminal"
+
 var telco_network
 var telco_name: String
 var users: UsersDirectory
@@ -323,13 +325,13 @@ func get_user_commands(username: String) -> Array[String]:
 	return commands
 
 
-func stdout(msg: String) -> void:
+func stdout(msg: String, end="\n") -> void:
 	print(telco_name + ": stdout")
-	signal_bus.terminal_stdout.emit(msg)
+	signal_bus.terminal_stdout.emit(msg + end)
 
 
-func stderr(msg: String) -> void:
-	signal_bus.terminal_stderr.emit(msg)
+func stderr(msg: String, end="\n") -> void:
+	signal_bus.terminal_stderr.emit(msg + end)
 
 
 func add_stats(type: String, value: String) -> void:
@@ -338,8 +340,8 @@ func add_stats(type: String, value: String) -> void:
 		stats[type].append(value)
 
 
-func send_network_data(source: String, destination: String, data: String) -> void:
-	signal_bus.network_data.emit(source, destination, data)
+func send_network_data(destination: String, data: String) -> void:
+	signal_bus.network_data.emit(telco_name, destination, data)
 
 
 func receive_network_data(source: String, destination: String, data: String) -> void:
@@ -347,6 +349,8 @@ func receive_network_data(source: String, destination: String, data: String) -> 
 	if destination != telco_name:
 		return	
 
+	send_network_data(TERMINAL_STRING, "ACK")
+	
 	run_service_cmd(data, source)
 
 
@@ -390,7 +394,7 @@ func run_cmd(cmd_string: String) -> void:
 
 			stdout(cmd + ": command not found")
 		1: # ShellState.REMOTE
-			send_network_data(telco_name, shell.connected_telco, shell.connected_service + " " + cmd_string)
+			send_network_data(shell.connected_telco, shell.connected_service + " " + cmd_string)
 			
 			if cmd_string == "exit":
 				shell.state = 0
@@ -461,6 +465,7 @@ func help_cmd(_cmd: String, _argv: Array) -> bool:
 		assert (executable_key != "", "Executable key not found")
 		msg += exe.filename.to_upper() + ": " + BINARIES[executable_key].help + "\n"
 	
+	msg = msg.rstrip("\n")
 	stdout(msg)
 	return true
 
@@ -481,6 +486,7 @@ func users_cmd(_cmd: String, _argv: Array) -> bool:
 	for user in users.get_users():
 		msg += user.username + "\n"
 	
+	msg = msg.rstrip("\n")
 	stdout(msg)
 	return true
 
@@ -619,6 +625,7 @@ func ps_cmd(_cmd: String, _argv: Array) -> bool:
 			msg += SERVICES[service["name"]].name + " (" + service["status"] + ")" + "\n"
 
 	if msg != "":
+		msg = msg.rstrip("\n")
 		stdout(msg)
 	return true
 
@@ -642,7 +649,7 @@ func dial_executable(_cmd: String, argv: Array) -> bool:
 
 	stdout("dialing...")
 	signal_bus.terminal_change_state.emit("DIALING")
-	send_network_data(telco_name, dst_telco, data)
+	send_network_data(dst_telco, data)
 	return true
 
 
@@ -699,7 +706,7 @@ func nc_executable(cmd: String, argv: Array) -> bool:
 	shell.connected_telco = dst_telco
 	shell.connected_service = dst_service
 
-	send_network_data(telco_name, dst_telco, dst_service)
+	send_network_data(dst_telco, dst_service)
 
 	return true
 
@@ -812,20 +819,21 @@ func vault_service_callback(_cmd: String, argv: Array, _source: String) -> bool:
 			processing_data = false
 			vault_data = {}
 
-		service_data = {"state": "init", "vaults": vaults}
+		service_data = {"state": "connected", "vaults": vaults}
 		memory.store_data(service_name, "mem", service_data)
 	
+	if service_data["state"] == "disconnected":
+		service_data["state"] = "connected"
+	
 	if argv.size() > 0 and argv[0] == "exit":
-		service_data["state"] = "init"
+		service_data["state"] = "disconnected"
 	else:
 		match service_data["state"]:
-			"init":
-				service_data["state"] = "connected"
 			"connected":
-				stdout("AVAILABLE VAULTS:")
+				stdout("\nAVAILABLE VAULTS:")
 				for vault_name in service_data["vaults"].keys():
 					stdout(vault_name)
-				stdout("ENTER VAULT NAME: ")
+				stdout("\nSELECT VAULT: ")
 				service_data["state"] = "awaiting"
 			"awaiting":
 				var vault_name = argv[0]
@@ -833,26 +841,28 @@ func vault_service_callback(_cmd: String, argv: Array, _source: String) -> bool:
 				if vault == null:
 					stdout("NO SUCH VAULT")
 				elif vault["password"] != "":
-					stdout("ENTER PASSWORD: ")
+					stdout("\nENTER PASSWORD: ")
 					service_data["current_vault"] = vault_name
 					service_data["state"] = "authenticating"
 				else:
-					stdout("ACCESS GRANTED. SELECT DATA TO VIEW:")
+					stdout("\nACCESS GRANTED. SELECT DATA TO VIEW:")
 					service_data["current_vault"] = vault_name
 					for data_name in vault["data"].keys():
 						stdout(data_name)
+					stdout("")
 					service_data["state"] = "selecting"
 			"authenticating":
 				var current_vault = service_data["current_vault"]
 				var password = argv[0]
 				if service_data["vaults"][current_vault]["password"] == password:
-					stdout("ACCESS GRANTED. SELECT DATA TO VIEW:")
+					stdout("\nACCESS GRANTED. SELECT DATA TO VIEW:")
 					for data_name in service_data["vaults"][current_vault]["data"].keys():
 						stdout(data_name)
+					stdout("")
 					service_data["state"] = "selecting"
 				else:
-					stderr("ACCESS DENIED")
-					stdout("ENTER VAULT NAME: ")
+					stderr("\nACCESS DENIED.")
+					stdout("SELECT VAULT: ")
 					service_data["state"] = "awaiting"
 			"selecting":
 				var current_vault = service_data["current_vault"]
@@ -860,16 +870,41 @@ func vault_service_callback(_cmd: String, argv: Array, _source: String) -> bool:
 
 				var selected_data = service_data["vaults"][current_vault]["data"].get(selected_data_name)
 				if selected_data == null:
-					stdout("NO SUCH DATA IN VAULT '" + current_vault + "'")
-					stdout("SELECT DATA TO VIEW:")
-					for data_name in service_data["vaults"][current_vault]["data"].keys():
-						stdout(data_name)
+					stdout("\nNO SUCH DATA IN VAULT '" + current_vault + "'")
 				else:
-					stdout(selected_data_name + ":")
-					stdout(selected_data)
-					stdout("\nSELECT DATA TO VIEW:")
-					for data_name in service_data["vaults"][current_vault]["data"].keys():
-						stdout(data_name)
+					var msg = "\n" + selected_data_name + ": "
+					if selected_data.find("\n") == -1:
+						msg += selected_data
+					else:
+						msg += "\n" + selected_data
+					stdout(msg)
+				
+				stdout("\nOPTIONS:")
+				stdout("1: QUERY DATA")
+				stdout("2: CHANGE VAULT")
+				stdout("\nSELECT OPTION:")
+				service_data["state"] = "ending"
+			"ending":
+				match argv[0]:
+					"1":
+						stdout("\nSELECT DATA TO VIEW:")
+						var current_vault = service_data["current_vault"]
+						for data_name in service_data["vaults"][current_vault]["data"].keys():
+							stdout(data_name)
+						stdout("")
+						service_data["state"] = "selecting"
+					"2":
+						stdout("\nAVAILABLE VAULTS:")
+						for vault_name in service_data["vaults"].keys():
+							stdout(vault_name)
+						stdout("\nSELECT VAULT: ")
+						service_data["state"] = "awaiting"
+					_:
+						stdout("\nBAD OPTION. OPTIONS:")
+						stdout("1: QUERY DATA")
+						stdout("2: CHANGE VAULT")
+						stdout("\nSELECT OPTION:")
+						service_data["state"] = "ending"
 	
 	memory.store_data(service_name, "mem", service_data)
 

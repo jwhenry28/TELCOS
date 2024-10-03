@@ -24,9 +24,8 @@ var terminal_noises: Node
 var cursor: Node
 var num_typing_noises: int
 var animation_timing: float
-var animation_label: Label
 var msg_buffer: Array[Dictionary]
-var received_state_change: bool
+var data_ack: bool
 
 var signal_bus
 
@@ -52,9 +51,10 @@ func _ready() -> void:
 	signal_bus.terminal_stderr.connect(_on_stderr)
 	signal_bus.terminal_change_telco.connect(_on_change_telco)
 	signal_bus.terminal_change_state.connect(_on_terminal_state_change)
+	signal_bus.network_data.connect(_on_data_recv)
 
 	next_msg_index = vbox_container.get_child_count() - 1
-	print("next_msg_index: ", next_msg_index)
+	print("terminal: next_msg_index: ", next_msg_index)
 	terminal_state = TerminalState.TYPING
 	msg_buffer = []
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
@@ -75,16 +75,18 @@ func _process(delta: float) -> void:
 			pass
 		TerminalState.DIALING:
 			var fps: float = 3.0
-			var num_frames: int = 3
+			var num_frames: int = 4
 			animation_timing += delta
 			var num_dots = int(animation_timing / (1.0 / fps)) % num_frames
 			var dialing_msg = "dialing" + ".".repeat(num_dots)
+			var animation_label = vbox_container.get_child(next_msg_index-2)
 			animation_label.text = dialing_msg
 
 			if animation_timing > DIAL_DURATION:
-				if !received_state_change:
-					add_to_history("no answer", true)
-				print("exceeded duration")
+				animation_label.text = "dialing..."
+				if !data_ack:
+					add_to_history("no answer\n", true)
+				print("terminal: exceeded duration")
 				_on_terminal_state_change("TYPING")
 		TerminalState.INACTIVE:
 			pass
@@ -121,7 +123,7 @@ func _input(event):
 	if Input.is_action_just_released("cmd_enter"): # for whatever reason, Godot renders the cursor in the wrong location if we use just_pressed for enter
 		var cmd = consume_text().strip_edges(true, true)
 
-		add_to_history(cursor.text + cmd)
+		add_to_history(cursor.text + cmd + "\n")
 		
 		telco_network.run_cmd(connected_telco, cmd)
 		match telco_network.get_telco(connected_telco).shell.state:
@@ -149,34 +151,60 @@ func adjust_scrollbar() -> void:
 		terminal_history_container.scroll_vertical = int(terminal_history_scrollbar.max_value)
 
 
-func add_to_history(text: String, is_stderr: bool = false) -> void:
-	print("adding to history: [", text + "]")
-	print("terminal state: ", TerminalState.keys()[terminal_state])
-	if terminal_state == TerminalState.TYPING or terminal_state == TerminalState.INACTIVE:
-		var label = Label.new()
-		label.name = text
-		label.text = text
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD
-		label.add_theme_color_override("font_color", TERMINAL_GREEN)
-		label.add_theme_font_size_override("font_size", FONT_SIZE)
+func add_to_history(text: String, is_stderr: bool = false, buffer_override = false) -> void:
+	print("terminal: adding to history: [", text + "]")
+	print("terminal: terminal state: ", TerminalState.keys()[terminal_state])
+	if terminal_state == TerminalState.TYPING or terminal_state == TerminalState.INACTIVE or buffer_override:
+		for char in text:
+			if char == "\n" or vbox_container.get_child_count() == 1:
+				var label = Label.new()
+				label.text = ""
+				label.visible = false
+				label.autowrap_mode = TextServer.AUTOWRAP_WORD
+				label.add_theme_color_override("font_color", TERMINAL_GREEN)
+				label.add_theme_font_size_override("font_size", FONT_SIZE)
 
-		vbox_container.add_child(label)
-		vbox_container.move_child(label, next_msg_index)
-		next_msg_index += 1
+				vbox_container.add_child(label)
+				vbox_container.move_child(label, next_msg_index)
+				next_msg_index += 1
+			
+			if char != "\n":
+				var current_label = vbox_container.get_child(next_msg_index - 1)
+				current_label.visible = true
+				current_label.text += char
+				
+		#if text.find("\n") == -1 and vbox_container.get_children().size() > 1:
+			#var last_item = vbox_container.get_child(next_msg_index - 2)
+			#print("terminal: last_item: " + last_item.name)
+			#last_item.text += text
+		#else:
+			#for chunk in text.split("\n", true, max(1, text.count("\n"))):
+				#print("terminal: chunk " + chunk)
+				#var label = Label.new()
+				#label.name = str(next_msg_index) + " " + chunk
+				#label.text = chunk
+				#label.autowrap_mode = TextServer.AUTOWRAP_WORD
+				#label.add_theme_color_override("font_color", TERMINAL_GREEN)
+				#label.add_theme_font_size_override("font_size", FONT_SIZE)
+#
+				#vbox_container.add_child(label)
+				#vbox_container.move_child(label, next_msg_index)
+				#next_msg_index += 1
 
 		if is_stderr:
 			terminal_noises.get_node("stderr").play()
 	else:
 		var msg = {"text": text, "is_stderr": is_stderr}
-		print("adding to buffer: ", msg)
+		print("terminal: adding to buffer: ", msg)
 		msg_buffer.append(msg)
 
 
 func terminal_dial(telco_name: String, username: String = "guest", password: String = "") -> void:
-	add_to_history("dialing...")
+	add_to_history("dialing...\n")
 	_on_terminal_state_change("DIALING")
 	var data = "dial.service " + username + ":" + password + "@" + telco_name
-	signal_bus.network_data.emit("terminal", telco_name, data)
+	data_ack = false
+	signal_bus.network_data.emit("user_terminal", telco_name, data)
 
 
 func _on_stderr(msg: String) -> void:
@@ -186,12 +214,11 @@ func _on_stderr(msg: String) -> void:
 func _on_change_telco(new_telco_name: String, username: String) -> void:
 	print("terminal: changing telco to ", username, "@", new_telco_name)
 	connected_telco = new_telco_name
-	received_state_change = true
 
 
 func _on_terminal_state_change(state: String) -> void:
 	terminal_state = TerminalState.get(state)
-	print("terminal_state is now: ", terminal_state)
+	print("terminal: terminal_state is now: ", terminal_state)
 
 	match terminal_state:
 		TerminalState.TYPING:
@@ -201,12 +228,19 @@ func _on_terminal_state_change(state: String) -> void:
 				var msg = msg_buffer.pop_front()
 				add_to_history(msg.text, msg.is_stderr)
 		TerminalState.DIALING:
-			received_state_change = false
+			data_ack = false
 			animation_timing = 0.0
-			print("animation_label: ", vbox_container.get_child(next_msg_index-1).name)
-			animation_label = vbox_container.get_child(next_msg_index-1)
 			cmd_prompt_textedit.release_focus()
 			signal_bus.play_sound.emit("dial")
 		TerminalState.INACTIVE:
 			cmd_prompt_textedit.focus_mode = Control.FOCUS_NONE
 			cmd_prompt_textedit.release_focus()
+
+
+func _on_data_recv(source: String, destination: String, data: String) -> void:
+	if destination != "user_terminal":
+		return
+	
+	match data:
+		"ACK":
+			data_ack = true

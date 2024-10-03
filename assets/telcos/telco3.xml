@@ -20,6 +20,9 @@
 					- SPECS: TELNIX v14.3, 16b, 1993
 					- USERS: 2/10
 					- FILESYSTEM: 1651B used, 30349B remaining 
+					- MESSAGE: Hello there
+					this is a test message.
+					did it work?
 
 					name: sysadmin
 					password: monkey
