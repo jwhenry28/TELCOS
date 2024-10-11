@@ -21,7 +21,9 @@ const _CURSOR: String = "█"
 var _buffer: Array
 var _caps_lock_enabled: bool
 var _echo_timer: float
-const ECHO_TIMER_DURATION: float = 1.0
+var _echo_duration_exceeded: bool
+const ECHO_TIMER_DURATION: float = 0.5
+const ECHO_REPEAT_TIMER_DURATION: float = 0.1
 
 var _cursor_right_limit: int
 var _cursor_idx: int
@@ -65,10 +67,7 @@ func get_num_rows_in_buffer() -> int:
 	var line_string = ""
 	var num_rows = 0
 	for key in _buffer:
-		if key == null:
-			continue
-		
-		if key == "\n":
+		if key == "\n" or key == null:
 			num_rows += 1
 			num_rows += floor((line_string.length() * _CHAR_WIDTH) / get_window_x())
 			line_string = ""
@@ -98,6 +97,7 @@ func _init() -> void:
 	_CHAR_WIDTH = 8.0 # TODO: MOVE THIS
 	_caps_lock_enabled = false
 	_echo_timer = -1.0
+	_echo_duration_exceeded = false
 	
 	_cursor_idx = 0
 	_cursor_right_limit = 0
@@ -112,8 +112,8 @@ func _ready() -> void:
 	terminal_noises = $"../SoundPlayer"
 
 	signal_bus = $"../SignalBus"
-	signal_bus.terminal_stdout.connect(write)
-	signal_bus.terminal_stderr.connect(write)
+	signal_bus.terminal_stdout.connect(_on_stdout)
+	signal_bus.terminal_stderr.connect(_on_stderr)
 	signal_bus.terminal_change_telco.connect(_on_change_telco)
 	signal_bus.terminal_change_state.connect(_on_terminal_state_change)
 	signal_bus.network_data.connect(_on_data_recv)
@@ -167,14 +167,14 @@ func _draw():
 	var start_line_index = _start_line_idx
 	var end_line_index = _start_line_idx + min(get_num_window_rows(), get_num_rows_in_buffer())
 
-	print("\ndraw: _start_line_idx=", _start_line_idx)
-	print("draw: size.y=", size.y)
-	print("draw: CHAR_HEIGTH=", _CHAR_HEIGHT)
-	print("draw: _text_border_size_y=", _text_border_size_y)
-	print("draw: get_window_y()=", get_window_y())
-	print("draw: get_num_window_rows=", get_num_window_rows())
-	print("draw: get_num_rows_in_buffer=", get_num_rows_in_buffer())
-	print("draw: end_line_index=", end_line_index)
+	# print("\ndraw: _start_line_idx=", _start_line_idx)
+	# print("draw: size.y=", size.y)
+	# print("draw: CHAR_HEIGTH=", _CHAR_HEIGHT)
+	# print("draw: _text_border_size_y=", _text_border_size_y)
+	# print("draw: get_window_y()=", get_window_y())
+	# print("draw: get_num_window_rows=", get_num_window_rows())
+	# print("draw: get_num_rows_in_buffer=", get_num_rows_in_buffer())
+	# print("draw: end_line_index=", end_line_index)
 	
 	for key in _buffer:
 		var idx_in_range = start_line_index <= line_idx and line_idx <= end_line_index
@@ -212,28 +212,34 @@ func _gui_input(event: InputEvent) -> void:
 			if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 				_start_line_idx = max(0, _start_line_idx - 1)
 			queue_redraw()
-	
-	var echo_duration_exceeded = false
-	
-	if event.is_echo() and _echo_timer == -1.0:
-		_echo_timer = 0.0
-	elif !event.is_echo():
-		_echo_timer = -1.0
+			
+	if event is InputEventKey:		
+		if event.is_echo() and _echo_timer == -1.0:
+			_echo_timer = 0.0
+		elif !event.is_echo():
+			_echo_timer = -1.0
+			_echo_duration_exceeded = false
 		
-	if _echo_timer > ECHO_TIMER_DURATION:
-		echo_duration_exceeded = true
-		
-	if event is InputEventKey and event.pressed and (!event.is_echo() or echo_duration_exceeded):
-		var c = event_to_char(event)
-		if c != "":
-			add_to_buffer(c, c=="\n")
-			_cursor_idx = _buffer.size() - 1
-		queue_redraw()
-		
-		if _cmd_string != null:
-			run_command(_cmd_string)
+		var repeat = false
+		if _echo_timer > ECHO_TIMER_DURATION:
+			print("gui: timer exceeded")
+			_echo_duration_exceeded = true
+			_echo_timer = 0.0
+		elif _echo_duration_exceeded and _echo_timer > ECHO_REPEAT_TIMER_DURATION:
+			print("gui: repeat")
+			_echo_timer = 0.0
+			repeat = true			
+
+		if event.pressed and (!event.is_echo() or repeat):
+			var c = event_to_char(event)
+			if c != "":
+				add_to_buffer(c, c=="\n")
+				_cursor_idx = _buffer.size() - 1
+			
+			if _cmd_string != null:
+				run_command(_cmd_string)
+				_cmd_string = null
 			queue_redraw()
-			_cmd_string = null
 
 
 func _on_change_telco(new_telco_name: String, username: String) -> void:
@@ -259,6 +265,16 @@ func _on_terminal_state_change(state: String) -> void:
 			signal_bus.play_sound.emit("dial")
 		TerminalState.INACTIVE:
 			release_focus()
+
+
+func _on_stdout(msg: String) -> void:
+	write(msg)
+	queue_redraw()
+
+
+func _on_stderr(msg: String) -> void:
+	write(msg, true)
+	queue_redraw()
 
 
 func _on_data_recv(_source: String, destination: String, data: String) -> void:
@@ -296,14 +312,14 @@ func write(text: String, is_stderr: bool = false, buffer_override: bool = false)
 			add_to_buffer(c)
 		_cursor_right_limit = _cursor_idx
 		_start_line_idx = max(0, get_num_rows_in_buffer() - get_num_window_rows())
-		print("write: _start_line_idx=", _start_line_idx)
-		print("write: size.y=", size.y)
-		print("write: CHAR_HEIGTH=", _CHAR_HEIGHT)
-		print("write: _text_border_size_y=", _text_border_size_y)
-		print("write: get_window_y()=", get_window_y())
-		print("write: get_num_window_rows=", get_num_window_rows())
-		print("write: get_num_rows_in_buffer=", get_num_rows_in_buffer())
-		queue_redraw()
+		# print("write: _start_line_idx=", _start_line_idx)
+		# print("write: size.y=", size.y)
+		# print("write: CHAR_HEIGTH=", _CHAR_HEIGHT)
+		# print("write: _text_border_size_y=", _text_border_size_y)
+		# print("write: get_window_y()=", get_window_y())
+		# print("write: get_num_window_rows=", get_num_window_rows())
+		# print("write: get_num_rows_in_buffer=", get_num_rows_in_buffer())
+		# queue_redraw()
 
 		if is_stderr:
 			terminal_noises.get_node("stderr").play()
