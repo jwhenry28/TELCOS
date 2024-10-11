@@ -1,4 +1,4 @@
-extends Panel
+class_name Terminal extends Panel
 
 enum TerminalState {
 	TYPING,
@@ -6,196 +6,234 @@ enum TerminalState {
 	INACTIVE,
 }
 
-const TERMINAL_GREEN: Color = Color8(57, 255, 20, 255)
-const BG_TERMINAL_GREEN: Color = Color8(11, 50, 4, 255)
-const FONT_SIZE: int = 12
 const DIAL_DURATION: float = 2.5
 
-var next_msg_index: int
-var old_max_scroll_height: float = 0.0
-var cmd_history_index: int = 0
+@export var _font: Font
+@export var _font_size: int
+@export var _font_color: Color
+@export var _text_border_size_x: int # TODO: get_num_rows_in_buffer() doesn't work when this value is 2, for some reason.
+@export var _text_border_size_y: int
 
-var terminal_history_container: ScrollContainer
-var vbox_container: VBoxContainer
-var cmd_prompt_textedit: TextEdit
-var terminal_history_scrollbar: VScrollBar
+var _CHAR_WIDTH: float
+var _CHAR_HEIGHT: float
+const _CURSOR: String = "█"
+
+var _buffer: Array
+var _caps_lock_enabled: bool
+var _echo_timer: float
+const ECHO_TIMER_DURATION: float = 1.0
+
+var _cursor_right_limit: int
+var _cursor_idx: int
+var _start_line_idx: int
+
+var _cmd_string
+var _terminal_history: Array
+var _last_cmd_idx: int
+
+var _buffered_writes: Array
+
+const TERMINAL_NAME: String = "user_terminal"
+
 var telco_network
 var terminal_noises: Node
-var cursor: Node
+
 var num_typing_noises: int
-var animation_timing: float
-var msg_buffer: Array[Dictionary]
-var data_ack: bool
+var _animation_timing: float
+var _dialing_pos: int
+var _data_ack: bool
 
 var signal_bus
 
 var connected_telco: String
 var terminal_state: TerminalState
 
+
+func get_num_window_rows() -> float:
+	return floor(get_window_y() / _CHAR_HEIGHT) - 1
+
+
+func get_window_x() -> float:
+	return size.x - (_text_border_size_x * 2.0) - _CHAR_WIDTH
+
+
+func get_window_y() -> float:
+	return size.y - (_text_border_size_y * 2.0) - _CHAR_HEIGHT
+
+
+func get_num_rows_in_buffer() -> int:
+	var line_string = ""
+	var num_rows = 0
+	for key in _buffer:
+		if key == null:
+			continue
+		
+		if key == "\n":
+			num_rows += 1
+			num_rows += floor((line_string.length() * _CHAR_WIDTH) / get_window_x())
+			line_string = ""
+		else:
+			line_string += key
+	
+	return num_rows
+
+
+func get_num_rows_in_buffer_old() -> int:
+	var num_rows_in_buffer = 0
+	var buffer_string = "".join(PackedStringArray(_buffer.slice(0, _buffer.size()-1)))
+	for item in buffer_string.split("\n"):
+		var tmp_rows = ceil((item.length() * _CHAR_WIDTH) / get_window_x())
+		num_rows_in_buffer += tmp_rows
+	print("get_rows: ret=", num_rows_in_buffer)
+	return num_rows_in_buffer
+
+
+func _init() -> void:
+	_buffer = [ null ]
+	_cmd_string = null
+	_terminal_history = [ "" ]
+	_buffered_writes = []
+		
+	_CHAR_HEIGHT = 16.0 # TODO: MOVE THIS
+	_CHAR_WIDTH = 8.0 # TODO: MOVE THIS
+	_caps_lock_enabled = false
+	_echo_timer = -1.0
+	
+	_cursor_idx = 0
+	_cursor_right_limit = 0
+	_last_cmd_idx = 0
+	_start_line_idx = 0
+
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	print("terminal: loading")
-	terminal_history_container = $"TerminalHistory"
-	vbox_container = $"TerminalHistory/VBoxContainer"
-	cmd_prompt_textedit = $"TerminalHistory/VBoxContainer/HBoxContainer/CmdPrompt"
-	terminal_history_scrollbar = $"TerminalHistory".get_v_scroll_bar()
 	telco_network = $"../TelcoNetwork"
 	terminal_noises = $"../SoundPlayer"
-	cursor = $"TerminalHistory/VBoxContainer/HBoxContainer/Cursor"
-
-	cursor.text = "> "
-	cmd_prompt_textedit.placeholder_text = "..."
 
 	signal_bus = $"../SignalBus"
-	signal_bus.terminal_stdout.connect(add_to_history)
-	signal_bus.terminal_stderr.connect(_on_stderr)
+	signal_bus.terminal_stdout.connect(write)
+	signal_bus.terminal_stderr.connect(write)
 	signal_bus.terminal_change_telco.connect(_on_change_telco)
 	signal_bus.terminal_change_state.connect(_on_terminal_state_change)
 	signal_bus.network_data.connect(_on_data_recv)
 
-	next_msg_index = vbox_container.get_child_count() - 1
-	print("terminal: next_msg_index: ", next_msg_index)
 	terminal_state = TerminalState.TYPING
-	msg_buffer = []
-	mouse_default_cursor_shape = Control.CURSOR_ARROW
 
-	cmd_prompt_textedit.grab_focus()
-	print(vbox_container.get_tree_string_pretty())
+	grab_focus()
+	
 	print("terminal: done")
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	if old_max_scroll_height < terminal_history_scrollbar.max_value:
-		adjust_scrollbar()
-		old_max_scroll_height = terminal_history_scrollbar.max_value
-	
+func _process(delta: float) -> void:	
 	match terminal_state:
 		TerminalState.TYPING:
-			pass
+			if _echo_timer >= 0:
+				_echo_timer += delta
 		TerminalState.DIALING:
 			var fps: float = 3.0
 			var num_frames: int = 4
-			animation_timing += delta
-			var num_dots = int(animation_timing / (1.0 / fps)) % num_frames
-			var dialing_msg = "dialing" + ".".repeat(num_dots)
-			var animation_label = vbox_container.get_child(next_msg_index-2)
-			animation_label.text = dialing_msg
+			_animation_timing += delta
 
-			if animation_timing > DIAL_DURATION:
-				animation_label.text = "dialing..."
-				if !data_ack:
-					add_to_history("no answer\n", true)
+			var num_dots = int(_animation_timing / (1.0 / fps)) % num_frames
+			for i in range(num_frames - 1):
+				if i < num_dots:
+					_buffer[_dialing_pos + i] = "."
+				else:
+					_buffer[_dialing_pos + i] = ""
+			queue_redraw()
+
+			if _animation_timing > DIAL_DURATION:
+				if !_data_ack:
+					write("no answer\n", true)
 				print("terminal: exceeded duration")
 				_on_terminal_state_change("TYPING")
 		TerminalState.INACTIVE:
 			pass
-	
-	
-func _input(event):
-	if event is InputEventKey and event.is_pressed() and !event.is_echo():
-		match event.keycode:
-			KEY_ENTER:
-				signal_bus.play_sound.emit("enter")
-			KEY_BACKSPACE:
-				signal_bus.play_sound.emit("backspace")
-			KEY_UP:
-				var terminal_history = telco_network.get_telco(connected_telco).session.user.terminal_history
-				if terminal_history.size() > 0 and cmd_history_index > 0:
-					cmd_history_index -= 1
-					var last_cmd = terminal_history[cmd_history_index]
-					var last_cmd_text = last_cmd["cmd"]
-					if last_cmd["argv"].size() > 0:
-						last_cmd_text += " " + " ".join(last_cmd["argv"])
-					cmd_prompt_textedit.set_line(0, last_cmd_text)
-			KEY_DOWN:
-				var terminal_history = telco_network.get_telco(connected_telco).session.user.terminal_history
-				if terminal_history.size() > 0 and cmd_history_index < terminal_history.size() - 1:
-					cmd_history_index += 1
-					var last_cmd = terminal_history[cmd_history_index]
-					var last_cmd_text = last_cmd["cmd"]
-					if last_cmd["argv"].size() > 0:
-						last_cmd_text += " " + " ".join(last_cmd["argv"])
-					cmd_prompt_textedit.set_line(0, last_cmd_text)
-			_:
-				signal_bus.play_sound.emit("key")
 
-	if Input.is_action_just_released("cmd_enter"): # for whatever reason, Godot renders the cursor in the wrong location if we use just_pressed for enter
-		var cmd = consume_text().strip_edges(true, true)
 
-		add_to_history(cursor.text + cmd + "\n")
+func _draw():
+	var x_limit = get_window_x() + _text_border_size_x
+	var _y_limit = get_window_y() + _text_border_size_y
+	
+	var x_start = _text_border_size_x
+	var y_start = _CHAR_HEIGHT + _text_border_size_y
+	var char_pos = Vector2(x_start, y_start)
+	
+	var idx = 0
 		
-		telco_network.run_cmd(connected_telco, cmd)
-		match telco_network.get_telco(connected_telco).shell.state:
-			0: # LOCAL
-				cursor.text = "> "
-				cmd_prompt_textedit.placeholder_text = "..."
-			1: # REMOTE
-				cursor.text = ""
-				cmd_prompt_textedit.placeholder_text = ""
-			_:
-				cursor.text = "@"
-		
-		cmd_history_index = telco_network.get_telco(connected_telco).session.user.terminal_history.size()
+	var line_idx = 0
+	var start_line_index = _start_line_idx
+	var end_line_index = _start_line_idx + min(get_num_window_rows(), get_num_rows_in_buffer())
 
-
-func consume_text() -> String:
-	var cmd = cmd_prompt_textedit.text
-	cmd_prompt_textedit.text = ""
+	print("\ndraw: _start_line_idx=", _start_line_idx)
+	print("draw: size.y=", size.y)
+	print("draw: CHAR_HEIGTH=", _CHAR_HEIGHT)
+	print("draw: _text_border_size_y=", _text_border_size_y)
+	print("draw: get_window_y()=", get_window_y())
+	print("draw: get_num_window_rows=", get_num_window_rows())
+	print("draw: get_num_rows_in_buffer=", get_num_rows_in_buffer())
+	print("draw: end_line_index=", end_line_index)
 	
-	return cmd
-
-
-func adjust_scrollbar() -> void:
-	if terminal_history_scrollbar != null:
-		terminal_history_container.scroll_vertical = int(terminal_history_scrollbar.max_value)
-
-
-func add_to_history(text: String, is_stderr: bool = false, buffer_override = false) -> void:
-	print("terminal: adding to history: [", text.replace("\n", "\\n") + "]")
-	if terminal_state == TerminalState.TYPING or terminal_state == TerminalState.INACTIVE or buffer_override:
-		for char in text:
-			if char == "\n" or vbox_container.get_child_count() == 1:
-				print("terminal: creating new label")
-				var label = Label.new()
-				label.text = ""
-				label.visible = false
-				label.autowrap_mode = TextServer.AUTOWRAP_WORD
-				label.add_theme_color_override("font_color", TERMINAL_GREEN)
-				label.add_theme_font_size_override("font_size", FONT_SIZE)
-				
-				var previous_label = vbox_container.get_child(next_msg_index - 1)
-				previous_label.visible = true
-
-				vbox_container.add_child(label)
-				vbox_container.move_child(label, next_msg_index)
-				next_msg_index += 1
+	for key in _buffer:
+		var idx_in_range = start_line_index <= line_idx and line_idx <= end_line_index
+		
+		if key != null:
+			var draw_key = key
 			
-			if char != "\n":
-				var current_label = vbox_container.get_child(next_msg_index - 1)
-				current_label.visible = true
-				current_label.text += char
+			if key == "\n":
+				draw_key = " "
+				
+			if idx_in_range:
+				draw_char(_font, char_pos, draw_key, _font_size, _font_color)
+			char_pos.x += _CHAR_WIDTH
+				
+			if key == "\n" or char_pos.x >= x_limit:
+				if idx_in_range:
+					char_pos.y += _CHAR_HEIGHT
+				char_pos.x = _text_border_size_x
+				line_idx += 1
+			
+		if idx_in_range and idx == _cursor_idx and terminal_state == TerminalState.TYPING:
+			draw_char(_font, char_pos, _CURSOR, _font_size, _font_color)
+		
+		idx += 1
 
-		if is_stderr:
-			terminal_noises.get_node("stderr").play()
-	else:
-		var msg = {"text": text, "is_stderr": is_stderr}
-		print("terminal: adding to buffer.")
-		msg_buffer.append(msg)
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.is_pressed():
+			if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				if get_num_rows_in_buffer() > get_num_window_rows():
+					_start_line_idx = min(_start_line_idx + 1, get_num_rows_in_buffer() - get_num_window_rows())
+				else:
+					_start_line_idx = 0
+			if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+				_start_line_idx = max(0, _start_line_idx - 1)
+			queue_redraw()
 	
-	print("terminal: message logged.")
-
-
-func terminal_dial(telco_name: String, username: String = "guest", password: String = "") -> void:
-	add_to_history("dialing...\n")
-	_on_terminal_state_change("DIALING")
-	var data = "dial.service " + username + ":" + password + "@" + telco_name
-	data_ack = false
-	signal_bus.network_data.emit("user_terminal", telco_name, data)
-
-
-func _on_stderr(msg: String) -> void:
-	add_to_history(msg, true)
+	var echo_duration_exceeded = false
+	
+	if event.is_echo() and _echo_timer == -1.0:
+		_echo_timer = 0.0
+	elif !event.is_echo():
+		_echo_timer = -1.0
+		
+	if _echo_timer > ECHO_TIMER_DURATION:
+		echo_duration_exceeded = true
+		
+	if event is InputEventKey and event.pressed and (!event.is_echo() or echo_duration_exceeded):
+		var c = event_to_char(event)
+		if c != "":
+			add_to_buffer(c, c=="\n")
+			_cursor_idx = _buffer.size() - 1
+		queue_redraw()
+		
+		if _cmd_string != null:
+			run_command(_cmd_string)
+			queue_redraw()
+			_cmd_string = null
 
 
 func _on_change_telco(new_telco_name: String, username: String) -> void:
@@ -209,25 +247,378 @@ func _on_terminal_state_change(state: String) -> void:
 
 	match terminal_state:
 		TerminalState.TYPING:
-			cmd_prompt_textedit.focus_mode = Control.FOCUS_ALL
-			cmd_prompt_textedit.grab_focus()
-			while msg_buffer.size() > 0:
-				var msg = msg_buffer.pop_front()
-				add_to_history(msg.text, msg.is_stderr)
+			grab_focus()
+			while _buffered_writes.size() > 0:
+				var msg = _buffered_writes.pop_front()
+				write(msg.text, msg.is_stderr)
 		TerminalState.DIALING:
-			data_ack = false
-			animation_timing = 0.0
-			cmd_prompt_textedit.release_focus()
+			_data_ack = false
+			_animation_timing = 0.0
+			_dialing_pos = _buffer.size() - 5
+			release_focus()
 			signal_bus.play_sound.emit("dial")
 		TerminalState.INACTIVE:
-			cmd_prompt_textedit.focus_mode = Control.FOCUS_NONE
-			cmd_prompt_textedit.release_focus()
+			release_focus()
 
 
-func _on_data_recv(source: String, destination: String, data: String) -> void:
-	if destination != "user_terminal":
+func _on_data_recv(_source: String, destination: String, data: String) -> void:
+	if destination != TERMINAL_NAME:
 		return
 	
 	match data:
 		"ACK":
-			data_ack = true
+			_data_ack = true
+
+
+func clear_current_line() -> void:
+	while _cursor_idx > _cursor_right_limit:
+		_buffer.remove_at(_cursor_right_limit)
+		_cursor_idx -= 1
+		
+
+
+func add_to_buffer(text: String, append_to_buffer: bool = false) -> void:
+	assert(text.length() == 1, "add_to_buffer: should only add char (input text len=" + str(text.length()) + ")")
+	
+	if append_to_buffer:
+		_buffer.insert(_buffer.size() - 1, text)
+	else:
+		_buffer.insert(_cursor_idx, text)
+	
+	if _buffer[-1] != null:
+		_buffer.append(null)
+	_cursor_idx += 1
+
+
+func write(text: String, is_stderr: bool = false, buffer_override: bool = false) -> void:
+	if terminal_state == TerminalState.TYPING or terminal_state == TerminalState.INACTIVE or buffer_override:
+		for c in text:
+			add_to_buffer(c)
+		_cursor_right_limit = _cursor_idx
+		_start_line_idx = max(0, get_num_rows_in_buffer() - get_num_window_rows())
+		print("write: _start_line_idx=", _start_line_idx)
+		print("write: size.y=", size.y)
+		print("write: CHAR_HEIGTH=", _CHAR_HEIGHT)
+		print("write: _text_border_size_y=", _text_border_size_y)
+		print("write: get_window_y()=", get_window_y())
+		print("write: get_num_window_rows=", get_num_window_rows())
+		print("write: get_num_rows_in_buffer=", get_num_rows_in_buffer())
+		queue_redraw()
+
+		if is_stderr:
+			terminal_noises.get_node("stderr").play()
+	else:
+		var msg = {"text": text, "is_stderr": is_stderr}
+		_buffered_writes.append(msg)
+
+
+func run_command(cmd_string: String) -> void:
+	telco_network.run_cmd(connected_telco, cmd_string)
+	match telco_network.get_telco(connected_telco).shell.state:
+		0: # LOCAL
+			write("> ")
+		_: 
+			pass
+
+
+func get_cmd_string() -> String:
+	return "".join(PackedStringArray(_buffer.slice(_cursor_right_limit, _buffer.size()-1)))
+
+
+func terminal_dial(telco_name: String, username: String = "guest", password: String = "") -> void:
+	write("dialing...\n")
+	_on_terminal_state_change("DIALING")
+	var data = "dial.service " + username + ":" + password + "@" + telco_name
+	_data_ack = false
+	signal_bus.network_data.emit(TERMINAL_NAME, telco_name, data)
+	write("> ")
+
+
+func event_to_char(event: InputEventKey) -> String:
+	var keycode_string = OS.get_keycode_string(event.get_keycode_with_modifiers())
+	var c = ""
+		
+	match keycode_string:
+		"A" when _caps_lock_enabled:
+			c = "A"
+		"A":
+			c = "a"
+		"Shift+A":
+			c = "A"
+		"B" when _caps_lock_enabled:
+			c = "B"
+		"B":
+			c = "b"
+		"Shift+B":
+			c = "B"
+		"C" when _caps_lock_enabled:
+			c = "C"
+		"C":
+			c = "c"
+		"Shift+C":
+			c = "C"
+		"D" when _caps_lock_enabled:
+			c = "D"
+		"D":
+			c = "d"
+		"Shift+D":
+			c = "D"
+		"E" when _caps_lock_enabled:
+			c = "E"
+		"E":
+			c = "e"
+		"Shift+E":
+			c = "E"
+		"F" when _caps_lock_enabled:
+			c = "F"
+		"F":
+			c = "f"
+		"Shift+F":
+			c = "F"
+		"G" when _caps_lock_enabled:
+			c = "G"
+		"G":
+			c = "g"
+		"Shift+G":
+			c = "G"
+		"H" when _caps_lock_enabled:
+			c = "H"
+		"H":
+			c = "h"
+		"Shift+H":
+			c = "H"
+		"I" when _caps_lock_enabled:
+			c = "I"
+		"I":
+			c = "i"
+		"Shift+I":
+			c = "I"
+		"J" when _caps_lock_enabled:
+			c = "J"
+		"J":
+			c = "j"
+		"Shift+J":
+			c = "J"
+		"K" when _caps_lock_enabled:
+			c = "K"
+		"K":
+			c = "k"
+		"Shift+K":
+			c = "K"
+		"L" when _caps_lock_enabled:
+			c = "L"
+		"L":
+			c = "l"
+		"Shift+L":
+			c = "L"
+		"M" when _caps_lock_enabled:
+			c = "M"
+		"M":
+			c = "m"
+		"Shift+M":
+			c = "M"
+		"N" when _caps_lock_enabled:
+			c = "N"
+		"N":
+			c = "n"
+		"Shift+N":
+			c = "N"
+		"O" when _caps_lock_enabled:
+			c = "O"
+		"O":
+			c = "o"
+		"Shift+O":
+			c = "O"
+		"P" when _caps_lock_enabled:
+			c = "P"
+		"P":
+			c = "p"
+		"Shift+P":
+			c = "P"
+		"Q" when _caps_lock_enabled:
+			c = "Q"
+		"Q":
+			c = "q"
+		"Shift+Q":
+			c = "Q"
+		"R" when _caps_lock_enabled:
+			c = "R"
+		"R":
+			c = "r"
+		"Shift+R":
+			c = "R"
+		"S" when _caps_lock_enabled:
+			c = "S"
+		"S":
+			c = "s"
+		"Shift+S":
+			c = "S"
+		"T" when _caps_lock_enabled:
+			c = "T"
+		"T":
+			c = "t"
+		"Shift+T":
+			c = "T"
+		"U" when _caps_lock_enabled:
+			c = "U"
+		"U":
+			c = "u"
+		"Shift+U":
+			c = "U"
+		"V" when _caps_lock_enabled:
+			c = "V"
+		"V":
+			c = "v"
+		"Shift+V":
+			c = "V"
+		"W" when _caps_lock_enabled:
+			c = "W"
+		"W":
+			c = "w"
+		"Shift+W":
+			c = "W"
+		"X" when _caps_lock_enabled:
+			c = "X"
+		"X":
+			c = "x"
+		"Shift+X":
+			c = "X"
+		"Y" when _caps_lock_enabled:
+			c = "Y"
+		"Y":
+			c = "y"
+		"Shift+Y":
+			c = "Y"
+		"Z" when _caps_lock_enabled:
+			c = "Z"
+		"Z":
+			c = "z"
+		"Shift+Z":
+			c = "Z"
+		"0":
+			c = "0"
+		"Shift+0":
+			c = ")"
+		"1":
+			c = "1"
+		"Shift+1":
+			c = "!"
+		"2":
+			c = "2"
+		"Shift+2":
+			c = "@"
+		"3":
+			c = "3"
+		"Shift+3":
+			c = "#"
+		"4":
+			c = "4"
+		"Shift+4":
+			c = "$"
+		"5":
+			c = "5"
+		"Shift+5":
+			c = "%"
+		"6":
+			c = "6"
+		"Shift+6":
+			c = "^"
+		"7":
+			c = "7"
+		"Shift+7":
+			c = "&"
+		"8":
+			c = "8"
+		"Shift+8":
+			c = "*"
+		"9":
+			c = "9"
+		"Shift+9":
+			c = "("
+		"QuoteLeft":
+			c = "`"
+		"Shift+QuoteLeft":
+			c = "~"
+		"Minus":
+			c = "-"
+		"Shift+Minus":
+			c = "_"
+		"Equal":
+			c = "="
+		"Shift+Equal":
+			c = "+"
+		"BracketLeft":
+			c = "["
+		"Shift+BracketLeft":
+			c = "{"
+		"BracketRight":
+			c = "]"
+		"Shift+BracketRight":
+			c = "}"
+		"BackSlash":
+			c = "\\"
+		"Shift+BackSlash":
+			c = "|"
+		"Semicolon":
+			c = ";"
+		"Shift+Semicolon":
+			c = ":"
+		"Apostrophe":
+			c = "'"
+		"Shift+Apostrophe":
+			c = '"'
+		"Comma":
+			c = ","
+		"Shift+Comma":
+			c = "<"
+		"Period":
+			c = "."
+		"Shift+Period":
+			c = ">"
+		"Slash":
+			c = "/"
+		"Shift+Slash":
+			c = "?"
+		"Space":
+			c = " "
+		"CapsLock":
+			_caps_lock_enabled = !_caps_lock_enabled
+		"Enter":
+			_cmd_string = get_cmd_string()
+			if _cmd_string != _terminal_history[_terminal_history.size() - 2]:
+				_terminal_history[-1] = _cmd_string
+				_terminal_history.append("")
+			_last_cmd_idx = _terminal_history.size() - 1
+			c = "\n"
+		"Left": 
+			_cursor_idx = max(_cursor_right_limit, _cursor_idx - 1)
+			while _cursor_idx > _cursor_right_limit and _buffer[_cursor_idx] == "\n":
+				_cursor_idx = _cursor_idx - 1
+		"Right": 
+			_cursor_idx = min(_cursor_idx + 1, _buffer.size() - 1)
+			while _cursor_idx < _buffer.size() and _buffer[_cursor_idx] == "\n":
+				_cursor_idx = _cursor_idx + 1
+		"Up": 
+			if _terminal_history.size() > 0 and _last_cmd_idx > -1:
+				clear_current_line()
+				_last_cmd_idx = max(0, _last_cmd_idx - 1)
+				var last_cmd = _terminal_history[_last_cmd_idx]
+				for _c in last_cmd:
+					add_to_buffer(_c)
+		"Down": 
+			if _terminal_history.size() > 0 and _last_cmd_idx < _terminal_history.size()-1:
+				clear_current_line()
+				_last_cmd_idx = min(_last_cmd_idx + 1, _terminal_history.size() - 1)
+				var last_cmd = _terminal_history[_last_cmd_idx]
+				for _c in last_cmd:
+					add_to_buffer(_c)
+		"Backspace":
+			if _cursor_idx > _cursor_right_limit:
+				_buffer.remove_at(_cursor_idx - 1)
+				_cursor_idx -= 1
+		_:
+			c = ""
+	
+	_start_line_idx = max(0, get_num_rows_in_buffer() - get_num_window_rows())
+	
+	return c

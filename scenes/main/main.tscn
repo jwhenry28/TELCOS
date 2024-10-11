@@ -60,7 +60,6 @@ text = "TELCOS"
 horizontal_alignment = 1
 
 [node name="Terminal" parent="." instance=ExtResource("2_vjuq6")]
-offset_bottom = 616.0
 
 [node name="Comms" parent="." instance=ExtResource("6_77t78")]
 offset_bottom = 308.0

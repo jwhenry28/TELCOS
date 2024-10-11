@@ -26,7 +26,7 @@ func _ready() -> void:
 				print("telco added")
 			file_name = dir.get_next()
 	
-	$"../Terminal".terminal_dial("telco3", "telco3", "password123")
+	$"../Terminal".terminal_dial("telco1", "guest", "")
 
 
 func get_telco(telco_name: String):
@@ -37,6 +37,7 @@ func get_telco(telco_name: String):
 
 
 func run_cmd(telco_name: String, cmd: String) -> void:
+	print("network: running command on telco: " + telco_name + " cmd: " + cmd)
 	var telcOS = get_telco(telco_name)
 	telcOS.run_cmd(cmd)
 
