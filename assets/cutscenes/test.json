@@ -1,9 +1,9 @@
 {
 	"elements": [
-		{"type": "dialogue", "speaker": "execut0r", "text": "ok, that's all u need to know."},
-		{"type": "pause", "duration": 1.0},
-		{"type": "dialogue", "speaker": "execut0r", "text": "i'm connecting you to TELCO1 rn. the creds I found are telco1:telco1"},
-		{"type": "action", "callback": "change_telco", "args": ["telco1"]},
-		{"type": "action", "callback": "play_sound", "args": ["dial"]},
+		{"type": "dialogue", "speaker": "execut0r", "text": "In TELNIX, you tell the computer what to do with 'commands'."},
+		{"type": "dialogue", "speaker": "execut0r", "text": "A command is just a word that you type into the terminal."},
+		{"type": "dialogue", "speaker": "execut0r", "text": "Start with the 'help' command."},
+		{"type": "wait_for_state", "query": {"telco": "sandbox", "state_event": "last_cmd", "args": {"cmd": "help"}}},
+		{"type": "dialogue", "speaker": "execut0r", "text": ""},
 	]
 }

@@ -53,6 +53,18 @@ func _process(_delta: float) -> void:
 			await handle_wait_for_state(current_element["query"])
 
 
+func add_label(text: String) -> Label:
+	var label = Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.add_theme_color_override("font_color", TERMINAL_GREEN)
+	label.add_theme_font_size_override("font_size", FONT_SIZE)
+	label.add_to_group("cutscene_labels")
+	vbox_container.add_child(label)
+
+	return label
+
+
 func play_cutscene(cutscene_name: String) -> void:
 	print("playing cutscene: ", cutscene_name)
 	signal_bus.terminal_change_state.emit("INACTIVE")
@@ -90,13 +102,14 @@ func advance_cutscene() -> void:
 
 
 func handle_dialogue(speaker: String, msg: String):
-	var label = Label.new()
-	label.text = speaker + "> "
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	label.add_theme_color_override("font_color", TERMINAL_GREEN)
-	label.add_theme_font_size_override("font_size", FONT_SIZE)
-	label.add_to_group("cutscene_labels")
-	vbox_container.add_child(label)
+	# var label = Label.new()
+	# label.text = speaker + "> "
+	# label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	# label.add_theme_color_override("font_color", TERMINAL_GREEN)
+	# label.add_theme_font_size_override("font_size", FONT_SIZE)
+	# label.add_to_group("cutscene_labels")
+	# vbox_container.add_child(label)
+	var label = add_label(speaker + "> ")
 	await type_text(msg, label)
 	signal_bus.play_sound.emit("enter")
 
@@ -130,6 +143,11 @@ func handle_action(action: String, args: Array):
 func handle_wait_for_state(query: Dictionary):
 	print("waiting for state: ", query)
 	signal_bus.terminal_change_state.emit("TYPING")
+
+	match query["state_event"]:
+		"last_cmd":
+			var last_label = vbox_container.get_child(vbox_container.get_child_count()-1)
+			last_label.text = "(type: help)"
 
 	if $"/root/Main".handle_query(query):
 		comm_state = CommState.READY

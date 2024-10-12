@@ -13,7 +13,7 @@ func _ready() -> void:
 	signal_bus = $"SignalBus"
 
 	# print(get_tree_string_pretty())
-	$"Comms".play_cutscene("tutorial")
+	# $"Comms".play_cutscene("tutorial")
 	print("main: done\n\n")
 
 
